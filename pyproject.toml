@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ElevenOne"            # Nombre en PyPI 
+version = "0.0.1"
+description = "The Python library for laboratory data processing and plotting"
+readme = "README.md"                  # Esta será la documentación visible en la portada de PyPI
+requires-python = ">=3.8"
+license = {text = "PolyForm Strict License 1.0.0."}
+
+dependencies = [
+    "matplotlib>=3.0.0",
+    "numpy>=1.20.0",
+]
+
+authors = [
+  { name = "Mario Sultan Romero", email = "mariosultan.uem@gmail.com" }
+]
+
+keywords = ["math", "mathematics", "physics", "chemistry", "laboratory", "lab"]
+
+classifiers = [
+    "Topic :: Scientific/Engineering",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Education",
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+
+# Enlaces que aparecerán en la barra lateral de tu paquete en PyPI
+[project.urls]
+Homepage = "https://github.com/MarioSultan/ElevenOne"  #Nombre actual del repositorio
+Documentation = "https://elevenone.readthedocs.io/en/latest/"
+Issues = "https://github.com/MarioSultan/ElevenOne/issues"
+
+# Configuración cuando NO usas la carpeta src/
+[tool.setuptools.packages.find]
+where = ["."]                          # Busca paquetes Python en la raíz del proyecto
