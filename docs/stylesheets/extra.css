@@ -1,51 +1,61 @@
 /* ==========================================================================
    ElevenOne — Material for MkDocs custom theme
-   Spectral Laboratory
+   Azure & Rose
    Brand colors: #00CCFF / #FF2AD4
    ========================================================================== */
 
 
-/* ---------- 1. Brand identity ---------- */
+/* ---------- 1. Color system ---------- */
 
 :root > * {
-  --md-primary-fg-color: #101C2C;
-  --md-primary-fg-color--light: #19344C;
-  --md-primary-fg-color--dark: #09121F;
+  --md-primary-fg-color: #2469B5;
+  --md-primary-fg-color--light: #438BD5;
+  --md-primary-fg-color--dark: #194D8A;
 
-  --md-accent-fg-color: #00A9D6;
-  --md-accent-fg-color--transparent: rgba(0, 204, 255, 0.10);
+  --md-accent-fg-color: #FF2AD4;
+  --md-accent-fg-color--transparent: rgba(255, 42, 212, 0.09);
 
   --eo-cyan: #00CCFF;
-  --eo-cyan-dark: #009FC9;
-  --eo-magenta: #FF2AD4;
+  --eo-blue: #3679D9;
+  --eo-blue-dark: #245D9F;
+  --eo-blue-deep: #194D8A;
 
-  --eo-navy: #101C2C;
-  --eo-navy-light: #19344C;
+  --eo-pink: #FF2AD4;
+  --eo-pink-soft: #FFE5F8;
 
-  --eo-paper: #F3F8FC;
-  --eo-surface: #FFFFFF;
-  --eo-ink: #172534;
-  --eo-muted: #657789;
+  --eo-sky: #EAF5FF;
+  --eo-sky-deep: #DCEEFF;
 
-  --eo-border: rgba(30, 75, 105, 0.14);
-  --eo-soft: rgba(0, 204, 255, 0.07);
+  --eo-paper: #F0F7FF;
+  --eo-white: #FFFFFF;
+
+  --eo-ink: #20344A;
+  --eo-muted: #71869C;
+
+  --eo-border: rgba(54, 121, 217, 0.17);
+  --eo-border-strong: rgba(54, 121, 217, 0.28);
+  --eo-blue-soft: rgba(54, 121, 217, 0.07);
 }
 
 [data-md-color-scheme="slate"] {
-  --md-primary-fg-color: #101C2C;
-  --md-primary-fg-color--light: #19344C;
-  --md-primary-fg-color--dark: #09121F;
+  --md-primary-fg-color: #2469B5;
+  --md-primary-fg-color--light: #438BD5;
+  --md-primary-fg-color--dark: #194D8A;
 
-  --md-accent-fg-color: #00CCFF;
-  --md-accent-fg-color--transparent: rgba(0, 204, 255, 0.13);
+  --md-accent-fg-color: #FF65DE;
+  --md-accent-fg-color--transparent: rgba(255, 42, 212, 0.12);
 
-  --eo-paper: #0D1622;
-  --eo-surface: #131F2D;
-  --eo-ink: #E5EDF5;
-  --eo-muted: #9AAFC0;
+  --eo-paper: #111D2B;
+  --eo-white: #19293B;
+  --eo-sky: #1D3249;
+  --eo-sky-deep: #243D57;
 
-  --eo-border: rgba(0, 204, 255, 0.17);
-  --eo-soft: rgba(0, 204, 255, 0.055);
+  --eo-ink: #E7F1FA;
+  --eo-muted: #A0B6CC;
+
+  --eo-border: rgba(100, 174, 255, 0.19);
+  --eo-border-strong: rgba(100, 174, 255, 0.30);
+  --eo-blue-soft: rgba(80, 160, 240, 0.09);
 }
 
 
@@ -61,52 +71,52 @@
 .md-typeset h3,
 .md-typeset h4 {
   font-weight: 650;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.025em;
 }
 
 .md-typeset h1 {
-  position: relative;
-  padding-bottom: 0.65rem;
-  border-bottom: 1px solid var(--eo-border);
+  color: var(--eo-blue-deep);
+  padding-bottom: 0.55rem;
+  border-bottom: 2px solid var(--eo-sky-deep);
 }
 
-.md-typeset h1::after {
-  content: "";
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  width: 76px;
-  height: 2px;
-  background: linear-gradient(
-    90deg,
-    var(--eo-cyan),
-    var(--eo-magenta)
-  );
+[data-md-color-scheme="slate"] .md-typeset h1 {
+  color: #8CCBFF;
 }
 
 .md-typeset h2 {
-  margin-top: 2.3em;
+  margin-top: 2.2em;
+  color: var(--eo-blue);
 }
 
 .md-typeset h3 {
   margin-top: 1.8em;
 }
 
+[data-md-color-scheme="slate"] .md-typeset h2 {
+  color: #75BFFF;
+}
+
 .MathJax_Display {
-  margin: 1.5em 0 !important;
+  margin: 1.4em 0 !important;
 }
 
 
-/* ---------- 3. Header: spectral identity ---------- */
+/* ---------- 3. Header: Azure identity ---------- */
 
 .md-header {
+  background: linear-gradient(
+    105deg,
+    #194D8A 0%,
+    #2469B5 55%,
+    #3679D9 100%
+  );
+
+  box-shadow: 0 3px 14px rgba(36, 105, 181, 0.19);
   position: relative;
-  overflow: hidden;
-  background: #101C2C;
-  box-shadow: 0 3px 16px rgba(5, 18, 32, 0.16);
 }
 
-/* Spectral line */
+/* Fine cyan highlight */
 
 .md-header::after {
   content: "";
@@ -114,14 +124,13 @@
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 2px;
+  height: 3px;
 
   background: linear-gradient(
     90deg,
-    var(--eo-cyan) 0%,
-    rgba(0, 204, 255, 0.25) 38%,
-    rgba(255, 42, 212, 0.55) 72%,
-    var(--eo-magenta) 100%
+    #00CCFF 0%,
+    #65DFFF 45%,
+    #FF2AD4 100%
   );
 }
 
@@ -132,102 +141,105 @@
 
 .md-header__title {
   font-weight: 750;
-  letter-spacing: 0.035em;
-}
-
-.md-header__topic {
-  color: #EAF7FC;
+  letter-spacing: 0.025em;
 }
 
 
 /* ---------- 4. Top navigation ---------- */
 
 .md-tabs {
-  background: #0B1522;
-  border-bottom: 1px solid rgba(0, 204, 255, 0.12);
+  background: #194D8A;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.13);
 }
 
 .md-tabs__link {
-  opacity: 0.72;
-  transition: opacity 180ms ease, color 180ms ease;
+  opacity: 0.78;
+  transition: opacity 160ms ease, color 160ms ease;
 }
 
 .md-tabs__link:hover,
 .md-tabs__link--active {
   opacity: 1;
-  color: var(--eo-cyan);
+  color: #FFFFFF;
 }
 
 .md-tabs__item--active {
-  border-bottom: 2px solid var(--eo-cyan);
+  border-bottom: 2px solid #FF2AD4;
 }
 
 
-/* ---------- 5. Sidebar: precision navigation ---------- */
+/* ---------- 5. Sidebar ---------- */
 
 .md-sidebar {
   background: transparent;
 }
 
 .md-nav__title {
+  color: var(--eo-blue-deep);
   font-weight: 700;
-  letter-spacing: 0.025em;
+  letter-spacing: 0.015em;
+}
+
+[data-md-color-scheme="slate"] .md-nav__title {
+  color: #8CCBFF;
 }
 
 .md-nav__link {
-  position: relative;
-  border-radius: 4px;
-  margin: 3px 0;
-  padding-top: 0.35em;
-  padding-bottom: 0.35em;
+  border-radius: 5px;
+  margin: 2px 0;
 
   transition:
-    background 160ms ease,
-    color 160ms ease,
-    padding-left 160ms ease;
+    background 140ms ease,
+    color 140ms ease,
+    padding-left 140ms ease;
 }
 
 .md-nav__link:hover {
-  background: var(--eo-soft);
-  padding-left: 0.85em;
+  background: var(--eo-blue-soft);
+  padding-left: 0.75em;
 }
 
 .md-nav__link--active {
-  color: var(--eo-cyan-dark);
+  color: var(--eo-blue-deep);
   font-weight: 700;
-  background: var(--md-accent-fg-color--transparent);
-  box-shadow: inset 2px 0 0 var(--eo-cyan);
+
+  background: rgba(0, 204, 255, 0.10);
+  box-shadow: inset 3px 0 0 var(--eo-cyan);
 }
 
 [data-md-color-scheme="slate"] .md-nav__link--active {
-  color: var(--eo-cyan);
+  color: #8CCBFF;
 }
 
 
-/* ---------- 6. Main canvas: clean scientific surface ---------- */
+/* ---------- 6. Main background and reading surface ---------- */
 
 .md-main {
   background-color: var(--eo-paper);
-
   background-image:
     radial-gradient(
-      ellipse at 95% 0%,
-      rgba(0, 204, 255, 0.055),
-      transparent 35%
+      ellipse at 0% 0%,
+      rgba(0, 204, 255, 0.10),
+      transparent 40%
     ),
     radial-gradient(
-      ellipse at 5% 85%,
-      rgba(255, 42, 212, 0.025),
-      transparent 32%
+      ellipse at 100% 100%,
+      rgba(54, 121, 217, 0.065),
+      transparent 40%
     );
 }
 
+/* White reading surface */
+
 .md-content__inner {
-  background: var(--eo-surface);
+  background: var(--eo-white);
   border: 1px solid var(--eo-border);
   border-radius: 10px;
+
   padding: 1.8rem 2.2rem;
-  box-shadow: 0 4px 22px rgba(20, 50, 75, 0.035);
+
+  box-shadow:
+    0 4px 20px rgba(54, 121, 217, 0.045);
 }
 
 .md-grid {
@@ -238,72 +250,77 @@
 /* ---------- 7. Links ---------- */
 
 .md-typeset a {
+  color: var(--eo-blue);
   font-weight: 550;
-  color: var(--eo-cyan-dark);
   text-decoration: none;
 
-  transition: color 160ms ease;
+  transition: color 150ms ease;
 }
 
 .md-typeset a:hover {
-  color: var(--eo-magenta);
-  text-decoration: none;
+  color: var(--eo-pink);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
 }
 
 [data-md-color-scheme="slate"] .md-typeset a {
-  color: var(--eo-cyan);
+  color: #69CFFF;
 }
 
 
-/* ---------- 8. Code: computational environment ---------- */
+/* ---------- 8. Code ---------- */
 
 .highlight {
-  border-radius: 9px;
+  border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 5px 20px rgba(5, 18, 32, 0.09);
+
+  box-shadow:
+    0 4px 14px rgba(36, 105, 181, 0.07);
 }
 
 .md-typeset pre > code {
   border: 1px solid var(--eo-border);
-  border-radius: 9px;
+  border-radius: 8px;
 }
 
 .md-typeset code {
+  color: #236CB5;
   border-radius: 4px;
-  color: #0086AD;
 }
 
 .md-clipboard {
-  color: var(--eo-cyan-dark);
+  color: var(--eo-blue);
 }
 
 .md-clipboard:hover {
-  color: var(--eo-magenta);
+  color: var(--eo-pink);
 }
 
 [data-md-color-scheme="slate"] .md-typeset code {
-  color: #65DFFF;
+  color: #83D9FF;
 }
 
 
-/* ---------- 9. Tables: structured data ---------- */
+/* ---------- 9. Tables ---------- */
 
 .md-typeset table:not([class]) {
   border: 1px solid var(--eo-border);
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 3px 14px rgba(20, 50, 75, 0.035);
+
+  box-shadow:
+    0 3px 12px rgba(36, 105, 181, 0.04);
 }
 
 .md-typeset table:not([class]) th {
-  background: #152B40;
-  color: #F2FAFF;
+  background: #3679D9;
+  color: #FFFFFF;
   font-weight: 650;
-  border-bottom: 2px solid var(--eo-cyan);
+  border-bottom: 2px solid #00CCFF;
 }
 
 .md-typeset table:not([class]) tr:hover {
-  background: var(--eo-soft);
+  background: var(--eo-blue-soft);
 }
 
 .md-typeset table:not([class]) td {
@@ -316,13 +333,13 @@
 .md-typeset .admonition,
 .md-typeset details {
   border-radius: 7px;
-  box-shadow: none;
   border: 1px solid var(--eo-border);
+  box-shadow: none;
 }
 
 .md-typeset .admonition-title,
 .md-typeset summary {
-  font-weight: 700;
+  font-weight: 650;
 }
 
 .md-typeset .admonition.note {
@@ -330,16 +347,19 @@
 }
 
 .md-typeset .admonition.tip {
-  border-left-color: var(--eo-magenta);
+  border-left-color: var(--eo-pink);
+}
+
+.md-typeset .admonition.warning {
+  border-left-color: #E6A23C;
 }
 
 
 /* ---------- 11. Search ---------- */
 
 .md-search__form {
-  border-radius: 6px;
-  border: 1px solid rgba(0, 204, 255, 0.15);
-  transition: border-color 160ms ease;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
 }
 
 .md-search__form:focus-within {
@@ -350,46 +370,46 @@
 /* ---------- 12. Footer ---------- */
 
 .md-footer {
-  background: #101C2C;
-  border-top: 1px solid rgba(0, 204, 255, 0.18);
+  background: #194D8A;
+  border-top: 3px solid var(--eo-cyan);
 }
 
 .md-footer-meta {
-  background: #09121F;
+  background: #143E70;
 }
 
 
 /* ---------- 13. Buttons ---------- */
 
 .md-button {
-  border-radius: 5px;
+  border-radius: 6px;
   font-weight: 650;
+
   transition:
-    transform 150ms ease,
-    box-shadow 150ms ease,
-    background 150ms ease;
+    transform 140ms ease,
+    box-shadow 140ms ease;
 }
 
 .md-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 5px 18px rgba(0, 160, 210, 0.17);
+  box-shadow: 0 4px 13px rgba(54, 121, 217, 0.18);
 }
 
 .md-button--primary {
-  background: #009FC9;
-  border-color: #009FC9;
+  background: var(--eo-blue);
+  border-color: var(--eo-blue);
 }
 
 .md-button--primary:hover {
-  background: #0086AD;
-  border-color: #0086AD;
+  background: var(--eo-blue-deep);
+  border-color: var(--eo-blue-deep);
 }
 
 
 /* ---------- 14. Focus and selection ---------- */
 
 ::selection {
-  background: rgba(0, 204, 255, 0.24);
+  background: rgba(255, 42, 212, 0.19);
   color: inherit;
 }
 
@@ -403,8 +423,7 @@
 
 @media screen and (max-width: 76.1875em) {
   .md-content__inner {
-    padding: 1.2rem;
-    border-radius: 7px;
+    padding: 1.3rem;
   }
 
   .md-typeset h1 {
@@ -414,17 +433,7 @@
 
 @media screen and (max-width: 44.9375em) {
   .md-content__inner {
-    border: none;
-    box-shadow: none;
-    padding: 0.5rem;
-  }
-
-  .md-main {
-    background-image:
-      radial-gradient(
-        ellipse at 95% 0%,
-        rgba(0, 204, 255, 0.045),
-        transparent 40%
-      );
+    padding: 0.8rem;
+    border-radius: 6px;
   }
 }
