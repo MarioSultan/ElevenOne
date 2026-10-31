@@ -100,25 +100,40 @@ class Quantity:
         target_value = (base_value - target_unit.offset) / target_unit.factor
         return Quantity(target_value, target_unit)
 
+    to = convert_to
+
     def __mul__(self, other):
         if isinstance(other, Quantity):
             return Quantity(self.value * other.value, self.unit * other.unit)
+        elif isinstance(other, Unit):
+            return Quantity(self.value, self.unit * other)
         elif isinstance(other, (int, float, np.number, np.ndarray, list)):
             return Quantity(self.value * other, self.unit)
 
     def __rmul__(self, other):
-        if isinstance(other, (int, float, np.number, np.ndarray, list)):
+        if isinstance(other, Quantity):
+            return Quantity(other.value * self.value, other.unit * self.unit)
+        elif isinstance(other, Unit):
+            return Quantity(self.value, other * self.unit)
+        elif isinstance(other, (int, float, np.number, np.ndarray, list)):
             return Quantity(other * self.value, self.unit)
-        return self.__mul__(other)
 
     def __truediv__(self, other):
         if isinstance(other, Quantity):
             return Quantity(self.value / other.value, self.unit / other.unit)
+        elif isinstance(other, Unit):
+            return Quantity(self.value, self.unit / other)
         elif isinstance(other, (int, float, np.number, np.ndarray, list)):
             return Quantity(self.value / other, self.unit)
 
     def __rtruediv__(self, other):
-        if isinstance(other, (int, float, np.number, np.ndarray, list)):
+        if isinstance(other, Quantity):
+            return Quantity(other.value / self.value, other.unit / self.unit)
+        elif isinstance(other, Unit):
+            inv_val = 1 / self.value
+            new_unit = other / self.unit
+            return Quantity(inv_val, new_unit)
+        elif isinstance(other, (int, float, np.number, np.ndarray, list)):
             inv_unit = 1 / self.unit
             return Quantity(other / self.value, inv_unit)
 
