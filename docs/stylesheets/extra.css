@@ -1,0 +1,430 @@
+/* ==========================================================================
+   ElevenOne — Material for MkDocs custom theme
+   Spectral Laboratory
+   Brand colors: #00CCFF / #FF2AD4
+   ========================================================================== */
+
+
+/* ---------- 1. Brand identity ---------- */
+
+:root > * {
+  --md-primary-fg-color: #101C2C;
+  --md-primary-fg-color--light: #19344C;
+  --md-primary-fg-color--dark: #09121F;
+
+  --md-accent-fg-color: #00A9D6;
+  --md-accent-fg-color--transparent: rgba(0, 204, 255, 0.10);
+
+  --eo-cyan: #00CCFF;
+  --eo-cyan-dark: #009FC9;
+  --eo-magenta: #FF2AD4;
+
+  --eo-navy: #101C2C;
+  --eo-navy-light: #19344C;
+
+  --eo-paper: #F3F8FC;
+  --eo-surface: #FFFFFF;
+  --eo-ink: #172534;
+  --eo-muted: #657789;
+
+  --eo-border: rgba(30, 75, 105, 0.14);
+  --eo-soft: rgba(0, 204, 255, 0.07);
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #101C2C;
+  --md-primary-fg-color--light: #19344C;
+  --md-primary-fg-color--dark: #09121F;
+
+  --md-accent-fg-color: #00CCFF;
+  --md-accent-fg-color--transparent: rgba(0, 204, 255, 0.13);
+
+  --eo-paper: #0D1622;
+  --eo-surface: #131F2D;
+  --eo-ink: #E5EDF5;
+  --eo-muted: #9AAFC0;
+
+  --eo-border: rgba(0, 204, 255, 0.17);
+  --eo-soft: rgba(0, 204, 255, 0.055);
+}
+
+
+/* ---------- 2. Typography ---------- */
+
+.md-typeset {
+  line-height: 1.75;
+  color: var(--eo-ink);
+}
+
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3,
+.md-typeset h4 {
+  font-weight: 650;
+  letter-spacing: -0.035em;
+}
+
+.md-typeset h1 {
+  position: relative;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid var(--eo-border);
+}
+
+.md-typeset h1::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 76px;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    var(--eo-cyan),
+    var(--eo-magenta)
+  );
+}
+
+.md-typeset h2 {
+  margin-top: 2.3em;
+}
+
+.md-typeset h3 {
+  margin-top: 1.8em;
+}
+
+.MathJax_Display {
+  margin: 1.5em 0 !important;
+}
+
+
+/* ---------- 3. Header: spectral identity ---------- */
+
+.md-header {
+  position: relative;
+  overflow: hidden;
+  background: #101C2C;
+  box-shadow: 0 3px 16px rgba(5, 18, 32, 0.16);
+}
+
+/* Spectral line */
+
+.md-header::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+
+  background: linear-gradient(
+    90deg,
+    var(--eo-cyan) 0%,
+    rgba(0, 204, 255, 0.25) 38%,
+    rgba(255, 42, 212, 0.55) 72%,
+    var(--eo-magenta) 100%
+  );
+}
+
+.md-header__inner {
+  position: relative;
+  z-index: 1;
+}
+
+.md-header__title {
+  font-weight: 750;
+  letter-spacing: 0.035em;
+}
+
+.md-header__topic {
+  color: #EAF7FC;
+}
+
+
+/* ---------- 4. Top navigation ---------- */
+
+.md-tabs {
+  background: #0B1522;
+  border-bottom: 1px solid rgba(0, 204, 255, 0.12);
+}
+
+.md-tabs__link {
+  opacity: 0.72;
+  transition: opacity 180ms ease, color 180ms ease;
+}
+
+.md-tabs__link:hover,
+.md-tabs__link--active {
+  opacity: 1;
+  color: var(--eo-cyan);
+}
+
+.md-tabs__item--active {
+  border-bottom: 2px solid var(--eo-cyan);
+}
+
+
+/* ---------- 5. Sidebar: precision navigation ---------- */
+
+.md-sidebar {
+  background: transparent;
+}
+
+.md-nav__title {
+  font-weight: 700;
+  letter-spacing: 0.025em;
+}
+
+.md-nav__link {
+  position: relative;
+  border-radius: 4px;
+  margin: 3px 0;
+  padding-top: 0.35em;
+  padding-bottom: 0.35em;
+
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    padding-left 160ms ease;
+}
+
+.md-nav__link:hover {
+  background: var(--eo-soft);
+  padding-left: 0.85em;
+}
+
+.md-nav__link--active {
+  color: var(--eo-cyan-dark);
+  font-weight: 700;
+  background: var(--md-accent-fg-color--transparent);
+  box-shadow: inset 2px 0 0 var(--eo-cyan);
+}
+
+[data-md-color-scheme="slate"] .md-nav__link--active {
+  color: var(--eo-cyan);
+}
+
+
+/* ---------- 6. Main canvas: clean scientific surface ---------- */
+
+.md-main {
+  background-color: var(--eo-paper);
+
+  background-image:
+    radial-gradient(
+      ellipse at 95% 0%,
+      rgba(0, 204, 255, 0.055),
+      transparent 35%
+    ),
+    radial-gradient(
+      ellipse at 5% 85%,
+      rgba(255, 42, 212, 0.025),
+      transparent 32%
+    );
+}
+
+.md-content__inner {
+  background: var(--eo-surface);
+  border: 1px solid var(--eo-border);
+  border-radius: 10px;
+  padding: 1.8rem 2.2rem;
+  box-shadow: 0 4px 22px rgba(20, 50, 75, 0.035);
+}
+
+.md-grid {
+  max-width: 1500px;
+}
+
+
+/* ---------- 7. Links ---------- */
+
+.md-typeset a {
+  font-weight: 550;
+  color: var(--eo-cyan-dark);
+  text-decoration: none;
+
+  transition: color 160ms ease;
+}
+
+.md-typeset a:hover {
+  color: var(--eo-magenta);
+  text-decoration: none;
+}
+
+[data-md-color-scheme="slate"] .md-typeset a {
+  color: var(--eo-cyan);
+}
+
+
+/* ---------- 8. Code: computational environment ---------- */
+
+.highlight {
+  border-radius: 9px;
+  overflow: hidden;
+  box-shadow: 0 5px 20px rgba(5, 18, 32, 0.09);
+}
+
+.md-typeset pre > code {
+  border: 1px solid var(--eo-border);
+  border-radius: 9px;
+}
+
+.md-typeset code {
+  border-radius: 4px;
+  color: #0086AD;
+}
+
+.md-clipboard {
+  color: var(--eo-cyan-dark);
+}
+
+.md-clipboard:hover {
+  color: var(--eo-magenta);
+}
+
+[data-md-color-scheme="slate"] .md-typeset code {
+  color: #65DFFF;
+}
+
+
+/* ---------- 9. Tables: structured data ---------- */
+
+.md-typeset table:not([class]) {
+  border: 1px solid var(--eo-border);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 3px 14px rgba(20, 50, 75, 0.035);
+}
+
+.md-typeset table:not([class]) th {
+  background: #152B40;
+  color: #F2FAFF;
+  font-weight: 650;
+  border-bottom: 2px solid var(--eo-cyan);
+}
+
+.md-typeset table:not([class]) tr:hover {
+  background: var(--eo-soft);
+}
+
+.md-typeset table:not([class]) td {
+  border-bottom: 1px solid var(--eo-border);
+}
+
+
+/* ---------- 10. Admonitions ---------- */
+
+.md-typeset .admonition,
+.md-typeset details {
+  border-radius: 7px;
+  box-shadow: none;
+  border: 1px solid var(--eo-border);
+}
+
+.md-typeset .admonition-title,
+.md-typeset summary {
+  font-weight: 700;
+}
+
+.md-typeset .admonition.note {
+  border-left-color: var(--eo-cyan);
+}
+
+.md-typeset .admonition.tip {
+  border-left-color: var(--eo-magenta);
+}
+
+
+/* ---------- 11. Search ---------- */
+
+.md-search__form {
+  border-radius: 6px;
+  border: 1px solid rgba(0, 204, 255, 0.15);
+  transition: border-color 160ms ease;
+}
+
+.md-search__form:focus-within {
+  border-color: var(--eo-cyan);
+}
+
+
+/* ---------- 12. Footer ---------- */
+
+.md-footer {
+  background: #101C2C;
+  border-top: 1px solid rgba(0, 204, 255, 0.18);
+}
+
+.md-footer-meta {
+  background: #09121F;
+}
+
+
+/* ---------- 13. Buttons ---------- */
+
+.md-button {
+  border-radius: 5px;
+  font-weight: 650;
+  transition:
+    transform 150ms ease,
+    box-shadow 150ms ease,
+    background 150ms ease;
+}
+
+.md-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 18px rgba(0, 160, 210, 0.17);
+}
+
+.md-button--primary {
+  background: #009FC9;
+  border-color: #009FC9;
+}
+
+.md-button--primary:hover {
+  background: #0086AD;
+  border-color: #0086AD;
+}
+
+
+/* ---------- 14. Focus and selection ---------- */
+
+::selection {
+  background: rgba(0, 204, 255, 0.24);
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--eo-cyan);
+  outline-offset: 3px;
+}
+
+
+/* ---------- 15. Responsive layout ---------- */
+
+@media screen and (max-width: 76.1875em) {
+  .md-content__inner {
+    padding: 1.2rem;
+    border-radius: 7px;
+  }
+
+  .md-typeset h1 {
+    font-size: 1.85rem;
+  }
+}
+
+@media screen and (max-width: 44.9375em) {
+  .md-content__inner {
+    border: none;
+    box-shadow: none;
+    padding: 0.5rem;
+  }
+
+  .md-main {
+    background-image:
+      radial-gradient(
+        ellipse at 95% 0%,
+        rgba(0, 204, 255, 0.045),
+        transparent 40%
+      );
+  }
+}
