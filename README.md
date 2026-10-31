@@ -2,10 +2,15 @@
 
 ![ElevenOne Logo](https://raw.githubusercontent.com/MarioSultan/ElevenOne/main/banner.png)
 
+![Examples](https://raw.githubusercontent.com/MarioSultan/ElevenOne/main/imgs/examples.png)
+
 ElevenOne is a Python library for seamless scientific unit management, rigorous laboratory data processing, and automated publication-ready plotting.
 
 Some of the things ElevenOne can do include:
-* Handling of physical units
+- Handling of physical units
+- Automatic data loading with unit detection
+- High-level scientific plotting and visualizations
+- Automated publication-grade scientific reports ★
 
 ---
 
@@ -19,8 +24,78 @@ from elevenone import *
 speed = 90 * km/h
 print(speed.convert_to(m/s))
 ```
-```python
+```text
 >>> 25 m/s
 ```
 
 ElevenOne has more than 60 different units to use in your project!
+
+---
+
+## Automatic Data Loading with Unit Detection
+
+ElevenOne can load data directly from CSV or Excel files (`.csv`, `.xls`, `.xlsx`), automatically detecting physical units in column headers (e.g., `Time (s)`, `Pressure [kPa]`) or within data cells.
+
+```python
+from elevenone import load_data
+
+# Load data automatically parsing units into Quantity objects
+df = load_data("experiment_results.csv")
+
+# Access columns directly; units are preserved and active
+print(df["Time"])
+print(df["Speed"].mean())
+```
+
+---
+
+## High-Level Scientific Plotting
+
+With `Data` objects, you can generate modern, publication-ready plots with built-in unit handling and automatic labeling:
+
+```python
+from elevenone import Data, s, m
+
+# Create dataset with units
+t = [1, 2, 3, 4, 5] * s
+d = [2.1, 4.3, 5.9, 8.1, 10.2] * m
+
+data = Data({"Time": t, "Distance": d})
+
+# Generate line plot with automatic labels
+fig, ax = data.plot(x="Time", y="Distance", title="Kinematic Trajectory")
+
+# Scatter plot with linear fit
+fig, ax = data.scatter(x="Time", y="Distance", fit=True, title="Linear Fit Analysis")
+```
+
+ElevenOne supports multiple visualization modes out of the box:
+- `data.plot()`: Line plots with area fills.
+- `data.scatter()`: Scatter plots with optional linear fit (`fit=True`).
+- `data.errorbar()`: Uncertainty visualization (`xerr`, `yerr`).
+- `data.hist()`: Distribution histograms.
+- `data.boxplot()` & `data.violin()`: Outlier and density distribution plots.
+- `data.residual_plot()`: Residual error analysis for fits.
+- `data.pairplot()`: Pairwise correlation grid.
+- `data.corr_heatmap()`: Pearson correlation heatmaps.
+
+---
+
+## Automated Scientific Reports
+
+Generate full statistical and visual analytical reports with a single function call in **HTML** or **PDF** format.
+
+```python
+from elevenone import load_data, generate_report
+
+# Load laboratory dataset
+data = load_data("lab_measurements.xlsx")
+
+# Generate complete HTML report
+generate_report(data, output_path="report.html", title="Laboratory Experiment Analysis")
+
+# Export as PDF (requires weasyprint or pdfkit)
+generate_report(data, output_path="report.pdf", format_type="pdf")
+```
+
+The report automatically compiles dataset overview metrics, descriptive statistics, advanced indicators (skewness, kurtosis, IQR), correlation matrices, and distribution graphs without exposing raw data lines.
