@@ -1,433 +1,540 @@
+"""Scientific report generator for ElevenOne Data objects.
+
+Generates an HTML report with exactly eleven numbered sections and an optional
+PDF report built directly with ReportLab (no wkhtmltopdf/WeasyPrint required).
+"""
+
+from __future__ import annotations
+
 import os
-import base64
 import io
+import base64
+import html
 import datetime
 import urllib.request
-import urllib.error
+import warnings
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# Default logo URL from GitHub (raw content)
 DEFAULT_LOGO_URL = "https://raw.githubusercontent.com/MarioSultan/ElevenOne/main/banner.png"
 
 
 class ReportGenerator:
-    """
-    Holy Grail Scientific Report Generator for Data objects.
-    Provides complete automated statistical analysis and next-gen visualizations
-    without displaying raw data rows.
-    """
-    def __init__(self, data_obj, logo_path: str = DEFAULT_LOGO_URL, title: str = "Comprehensive Scientific Data Report", author: str = None):
+    """Create fixed-structure, eleven-section scientific reports for Data objects."""
+
+    def __init__(
+        self,
+        data_obj,
+        logo_path: str = DEFAULT_LOGO_URL,
+        title: str = "Comprehensive Scientific Data Report",
+        author: str = None,
+    ):
         self.data = data_obj
         self.logo_path = logo_path
         self.title = title
         self.author = author or "ElevenOne"
-        
-        # Color palette inherited from Data object attributes
-        self.primary_color = getattr(data_obj, '_primary_color', '#00ccff')
-        self.secondary_color = getattr(data_obj, '_secondary_color', '#ff2ad4')
-        self.facecolor = getattr(data_obj, '_facecolor', '#fcfcfc')
-        self.figure_facecolor = getattr(data_obj, '_figure_facecolor', '#ffffff')
-        self.grid_color = getattr(data_obj, '_grid_color', '#ebebeb')
-        self.text_color = getattr(data_obj, '_text_color', '#1a1a1a')
+        self.primary_color = getattr(data_obj, "_primary_color", "#00ccff")
+        self.secondary_color = getattr(data_obj, "_secondary_color", "#ff2ad4")
+        self.facecolor = getattr(data_obj, "_facecolor", "#fcfcfc")
+        self.figure_facecolor = getattr(data_obj, "_figure_facecolor", "#ffffff")
+        self.grid_color = getattr(data_obj, "_grid_color", "#ebebeb")
+        self.text_color = getattr(data_obj, "_text_color", "#1a1a1a")
+        self._plot_cache = None
 
-    def _fig_to_base64(self, fig):
-        """Converts a Matplotlib figure into a Base64-encoded PNG string."""
-        buf = io.BytesIO()
-        fig.savefig(buf, format='png', dpi=200, bbox_inches='tight', facecolor=fig.get_facecolor())
+    # ------------------------------------------------------------------
+    # General helpers
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _safe_text(value):
+        if isinstance(value, (np.integer,)):
+            return str(int(value))
+        if isinstance(value, (np.floating,)):
+            return f"{float(value):.6g}"
+        return str(value)
+
+    @staticmethod
+    def _fig_to_bytes(fig):
+        buffer = io.BytesIO()
+        fig.savefig(
+            buffer, format="png", dpi=160, bbox_inches="tight",
+            facecolor=fig.get_facecolor(),
+        )
         plt.close(fig)
-        buf.seek(0)
-        return base64.b64encode(buf.read()).decode('utf-8')
+        buffer.seek(0)
+        return buffer.getvalue()
 
-    def _get_logo_base64(self):
-        """Retrieves the logo image as base64 from a URL or local file path."""
+    @staticmethod
+    def _fig_to_base64(fig):
+        return base64.b64encode(ReportGenerator._fig_to_bytes(fig)).decode("ascii")
+
+    def _get_logo_bytes(self):
         if not self.logo_path:
             return None
-
-        target_path = self.logo_path
-        if "github.com" in target_path and "/blob/" in target_path:
-            target_path = target_path.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
-
-        if target_path.startswith("http://") or target_path.startswith("https://"):
-            try:
-                req = urllib.request.Request(
-                    target_path, 
-                    headers={'User-Agent': 'Mozilla/5.0'}
-                )
-                with urllib.request.urlopen(req, timeout=5) as response:
-                    data = response.read()
-                    encoded = base64.b64encode(data).decode('utf-8')
-                    ext = target_path.split('?')[0].split('.')[-1].lower()
-                    mime = 'image/png' if ext == 'png' else 'image/jpeg' if ext in ['jpg', 'jpeg'] else 'image/svg+xml'
-                    return f"data:{mime};base64,{encoded}"
-            except Exception as e:
-                print(f"[Warning] Failed to download logo from URL ({target_path}): {e}")
-                return None
-
-        elif os.path.exists(target_path):
-            try:
-                with open(target_path, "rb") as image_file:
-                    encoded = base64.b64encode(image_file.read()).decode('utf-8')
-                    ext = target_path.split('.')[-1].lower()
-                    mime = 'image/png' if ext == 'png' else 'image/jpeg' if ext in ['jpg', 'jpeg'] else 'image/svg+xml'
-                    return f"data:{mime};base64,{encoded}"
-            except Exception as e:
-                print(f"[Warning] Failed to load local logo ({target_path}): {e}")
-                return None
-
+        path = str(self.logo_path)
+        if "github.com" in path and "/blob/" in path:
+            path = path.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
+        try:
+            if path.startswith(("http://", "https://")):
+                request = urllib.request.Request(path, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(request, timeout=5) as response:
+                    return response.read()
+            if os.path.isfile(path):
+                with open(path, "rb") as image_file:
+                    return image_file.read()
+        except Exception as exc:
+            warnings.warn(f"Could not load report logo: {exc}")
         return None
 
-    def _generate_plots(self):
-        """Generates extended analytics visualizations matching the Data theme."""
-        plots_b64 = []
-        numeric_cols = list(self.data._numeric_columns().keys())
+    def _numeric_columns(self):
+        return list(self.data._numeric_columns().keys())
 
-        if not numeric_cols:
-            return plots_b64
+    def _overview(self):
+        rows, columns = self.data.shape
+        numeric = len(self._numeric_columns())
+        return pd.DataFrame(
+            {"Value": [rows, columns, numeric, columns - numeric]},
+            index=["Total observations (rows)", "Total variables (columns)",
+                   "Numeric variables", "Non-numeric / categorical variables"],
+        )
 
-        # 1. Distribution Analysis (Histograms)
-        for col in numeric_cols:
-            fig, _ = self.data.hist(column=col, title=f"Distribution: {col}")
-            plots_b64.append({
-                'title': f"Distribution of {col}",
-                'description': f"Frequency distribution histogram illustrating variation and central tendencies for quantitative variable '{col}'.",
-                'image': self._fig_to_base64(fig)
-            })
-
-        # 2. Global Distribution Comparisons (Box Plot & Violin Plot)
-        if len(numeric_cols) >= 1:
-            fig_box, _ = self.data.boxplot(columns=numeric_cols, title="Comparative Box Plot Analysis")
-            plots_b64.append({
-                'title': "Global Outlier & Quartile Analysis (Box Plot)",
-                'description': "Side-by-side box-and-whisker plot highlighting medians, interquartile ranges, and extreme outliers across variables.",
-                'image': self._fig_to_base64(fig_box)
-            })
-
-            fig_violin, _ = self.data.violin(columns=numeric_cols, title="Kernel Density & Distribution Shape (Violin Plot)")
-            plots_b64.append({
-                'title': "Comparative Density Profiles (Violin Plot)",
-                'description': "Violin plot presenting empirical distribution density structures and medians for each numeric variable.",
-                'image': self._fig_to_base64(fig_violin)
-            })
-
-        # 3. Bivariate Relationships & Regression Analysis
-        if len(numeric_cols) >= 2:
-            for i in range(len(numeric_cols)):
-                for j in range(i + 1, len(numeric_cols)):
-                    x_col, y_col = numeric_cols[i], numeric_cols[j]
-                    
-                    # Scatter Plot with Fit Line
-                    fig_scat, _ = self.data.scatter(x=x_col, y=y_col, fit=True, title=f"Bivariate Fit: {x_col} vs {y_col}")
-                    plots_b64.append({
-                        'title': f"Linear Regression Analysis ({x_col} vs {y_col})",
-                        'description': f"Scatter plot with a fitted linear trendline evaluating relationship strength between {x_col} and {y_col}.",
-                        'image': self._fig_to_base64(fig_scat)
-                    })
-
-                    # Residual Analysis Plot
-                    fig_res, _ = self.data.residual_plot(x=x_col, y=y_col, title=f"Regression Residuals: {x_col} vs {y_col}")
-                    plots_b64.append({
-                        'title': f"Model Residual Analysis ({x_col} vs {y_col})",
-                        'description': f"Residual error dispersion plot used to verify homoscedasticity and zero-mean assumption for linear modeling.",
-                        'image': self._fig_to_base64(fig_res)
-                    })
-
-        # 4. Pairwise Relationships (Pairplot)
-        if len(numeric_cols) >= 2:
-            fig_pair, _ = self.data.pairplot(columns=numeric_cols)
-            plots_b64.append({
-                'title': "Multivariate Pairwise Grid (Pairplot)",
-                'description': "Comprehensive pairwise interaction matrix displaying univariate distributions along the diagonal and bivariate scatter plots elsewhere.",
-                'image': self._fig_to_base64(fig_pair)
-            })
-
-        # 5. Correlation Heatmap
-        corr_df = self.data.corr()
-        if not corr_df.empty and len(corr_df.columns) > 1:
-            fig_heatmap, _ = self.data.corr_heatmap(title="Pearson Correlation Matrix")
-            plots_b64.append({
-                'title': "Variable Correlation Matrix Heatmap",
-                'description': "Heatmap visualizing pairwise Pearson correlation coefficients ($r$) across all numerical variables.",
-                'image': self._fig_to_base64(fig_heatmap)
-            })
-
-        return plots_b64
-
-    def _compute_dataset_overview(self):
-        """Computes structural metadata and dataset metrics."""
-        rows, cols = self.data.shape
-        num_cols = len(self.data._numeric_columns())
-        non_num_cols = cols - num_cols
-        
-        overview = {
-            "Total Observations (Rows)": rows,
-            "Total Variables (Columns)": cols,
-            "Numeric Variables": num_cols,
-            "Non-Numeric / Categorical Variables": non_num_cols
-        }
-        return pd.DataFrame([overview], index=["Value"]).T
-
-    def _compute_advanced_stats(self):
-        """Calculates extended statistical indicators (Variance, Skewness, Kurtosis, IQR)."""
-        numeric_cols = self.data._numeric_columns()
-        extended_data = {}
-        
-        for k, v in numeric_cols.items():
-            is_qty = hasattr(v, 'value')
-            vals = v.value if is_qty else np.asarray(v)
-            
-            p25 = np.percentile(vals, 25)
-            p75 = np.percentile(vals, 75)
-            iqr = p75 - p25
-            var_val = np.var(vals, ddof=1) if len(vals) > 1 else 0.0
-            
-            mean_val = np.mean(vals)
-            std_val = np.std(vals, ddof=1) if len(vals) > 1 else 1.0
-            if std_val > 0 and len(vals) > 2:
-                skew_val = np.mean(((vals - mean_val) / std_val) ** 3)
-                kurt_val = np.mean(((vals - mean_val) / std_val) ** 4) - 3.0
+    def _advanced_stats(self):
+        numeric_columns = self.data._numeric_columns()
+        result = {}
+        for name, column in numeric_columns.items():
+            is_quantity = hasattr(column, "value") and hasattr(column, "unit")
+            values = np.asarray(column.value if is_quantity else column, dtype=float)
+            unit = f" {column.unit.symbol}" if is_quantity else ""
+            if values.size == 0:
+                result[name] = ["—"] * 4
+                continue
+            q1, q3 = np.percentile(values, [25, 75])
+            variance = np.var(values, ddof=1) if len(values) > 1 else 0.0
+            mean = np.mean(values)
+            std = np.std(values, ddof=1) if len(values) > 1 else 0.0
+            if std > 0 and len(values) > 2:
+                skewness = np.mean(((values - mean) / std) ** 3)
+                excess_kurtosis = np.mean(((values - mean) / std) ** 4) - 3
             else:
-                skew_val, kurt_val = 0.0, 0.0
-
-            unit_suffix = f" {v.unit.symbol}" if is_qty else ""
-            
-            extended_data[k] = [
-                f"{var_val:.4g}{unit_suffix}",
-                f"{iqr:.4g}{unit_suffix}",
-                f"{skew_val:.4f}",
-                f"{kurt_val:.4f}"
+                skewness, excess_kurtosis = 0.0, 0.0
+            result[name] = [
+                f"{variance:.4g}{unit}", f"{q3 - q1:.4g}{unit}",
+                f"{skewness:.4f}", f"{excess_kurtosis:.4f}",
             ]
-            
-        return pd.DataFrame(extended_data, index=["Variance", "IQR (Q3 - Q1)", "Skewness", "Excess Kurtosis"])
+        return pd.DataFrame(
+            result,
+            index=["Variance", "Interquartile range (IQR)", "Skewness", "Excess kurtosis"],
+        )
 
+    @staticmethod
+    def _table_html(frame, index=True):
+        if frame is None or frame.empty:
+            return '<p class="empty">Not available for this dataset.</p>'
+        return frame.to_html(classes="report-table", border=0, escape=True, index=index)
+
+    def _make_plot(self, function, *args, **kwargs):
+        try:
+            result = function(*args, **kwargs)
+            fig = result[0] if isinstance(result, tuple) else result
+            return self._fig_to_bytes(fig)
+        except Exception as exc:
+            warnings.warn(f"A report plot could not be generated: {exc}")
+            return None
+
+    def _generate_plot_groups(self):
+        """Build the plot collections used by sections 5–11."""
+        if self._plot_cache is not None:
+            return self._plot_cache
+
+        columns = self._numeric_columns()
+        groups = {key: [] for key in (
+            "histograms", "boxplot", "violin", "scatter", "residuals", "pairplot", "heatmap"
+        )}
+        if not columns:
+            self._plot_cache = groups
+            return groups
+
+        for column in columns:
+            image = self._make_plot(self.data.hist, column=column, title=f"Distribution: {column}")
+            if image:
+                groups["histograms"].append((f"Distribution of {column}", image))
+
+        image = self._make_plot(self.data.boxplot, columns=columns, title="Comparative box plot")
+        if image:
+            groups["boxplot"].append(("Box plot", image))
+
+        image = self._make_plot(self.data.violin, columns=columns, title="Comparative violin plot")
+        if image:
+            groups["violin"].append(("Violin plot", image))
+
+        if len(columns) >= 2:
+            for i, x_column in enumerate(columns):
+                for y_column in columns[i + 1:]:
+                    image = self._make_plot(
+                        self.data.scatter, x=x_column, y=y_column, fit=True,
+                        title=f"{x_column} vs {y_column}",
+                    )
+                    if image:
+                        groups["scatter"].append((f"{x_column} vs {y_column}", image))
+                    image = self._make_plot(
+                        self.data.residual_plot, x=x_column, y=y_column,
+                        title=f"Residuals: {x_column} vs {y_column}",
+                    )
+                    if image:
+                        groups["residuals"].append((f"{x_column} vs {y_column}", image))
+
+            image = self._make_plot(self.data.pairplot, columns=columns)
+            if image:
+                groups["pairplot"].append(("Pairwise plot matrix", image))
+
+        if len(columns) >= 2:
+            image = self._make_plot(self.data.corr_heatmap, title="Pearson correlation matrix")
+            if image:
+                groups["heatmap"].append(("Correlation heatmap", image))
+
+        self._plot_cache = groups
+        return groups
+
+    def _report_sections(self):
+        """Return exactly eleven sections, even if some analyses are unavailable."""
+        describe = self.data.describe().df
+        correlation = self.data.corr()
+        groups = self._generate_plot_groups()
+        return [
+            ("Executive dataset overview", self._overview(), None),
+            ("Primary descriptive statistics", describe, None),
+            ("Advanced statistical indicators", self._advanced_stats(), None),
+            ("Pearson correlation matrix", correlation, None),
+            ("Univariate distribution analysis", None, groups["histograms"]),
+            ("Global quartile and outlier analysis", None, groups["boxplot"]),
+            ("Distribution density analysis", None, groups["violin"]),
+            ("Bivariate relationships and linear regression", None, groups["scatter"]),
+            ("Regression residual analysis", None, groups["residuals"]),
+            ("Multivariate pairwise analysis", None, groups["pairplot"]),
+            ("Correlation heatmap", None, groups["heatmap"]),
+        ]
+
+    @staticmethod
+    def _plot_description(section_number):
+        descriptions = {
+            5: "Histograms showing the frequency distribution of each numerical variable.",
+            6: "Box plots summarising medians, quartiles, spread and potential outliers.",
+            7: "Violin plots showing the shape of the observed distributions.",
+            8: "Scatter plots with a fitted straight line for each numerical variable pair.",
+            9: "Residual plots for the corresponding linear fits; useful for inspecting systematic deviations.",
+            10: "Pairwise matrix combining univariate distributions and bivariate scatter plots.",
+            11: "Graphical representation of Pearson correlation coefficients.",
+        }
+        return descriptions.get(section_number, "")
+
+    # ------------------------------------------------------------------
+    # HTML
+    # ------------------------------------------------------------------
     def _build_html_content(self):
-        """Constructs the complete HTML scientific report layout."""
-        df_overview_html = self._compute_dataset_overview().to_html(classes='styled-table', header=False)
-        
-        describe_res = self.data.describe()
-        df_stats = describe_res.df.to_html(classes='styled-table')
-        df_ext_stats = self._compute_advanced_stats().to_html(classes='styled-table')
-        
-        corr_df = self.data.corr()
-        df_corr = corr_df.to_html(classes='styled-table') if not corr_df.empty else "<p>Insufficient numerical columns for correlation matrix.</p>"
+        sections = self._report_sections()
+        timestamp = datetime.datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z")
+        logo = self._get_logo_bytes()
+        logo_html = (
+            f'<img class="logo" src="data:image/png;base64,{base64.b64encode(logo).decode("ascii")}" alt="Logo">'
+            if logo else ""
+        )
+        section_html = []
+        for number, (heading, frame, plots) in enumerate(sections, start=1):
+            content = ""
+            if frame is not None:
+                content = self._table_html(frame)
+            else:
+                plot_items = plots or []
+                if plot_items:
+                    for plot_title, image_bytes in plot_items:
+                        encoded = base64.b64encode(image_bytes).decode("ascii")
+                        content += (
+                            '<figure class="plot">'
+                            f'<figcaption>{html.escape(plot_title)}</figcaption>'
+                            f'<img src="data:image/png;base64,{encoded}" alt="{html.escape(plot_title)}">'
+                            '</figure>'
+                        )
+                else:
+                    content = '<p class="empty">This analysis is not available for the current dataset.</p>'
+            section_html.append(
+                f'<details class="section" {"open" if number == 1 else ""}>'
+                f'<summary><span class="number">{number:02d}</span>'
+                f'<span>{html.escape(heading)}</span></summary>'
+                f'<div class="section-content">{content}</div></details>'
+            )
 
-        logo_src = self._get_logo_base64()
-        logo_html = f'<img src="{logo_src}" class="module-logo" alt="Module Logo" />' if logo_src else '<div class="logo-placeholder"><span>Module Logo</span></div>'
-
-        plots = self._generate_plots()
-        plots_html = ""
-        for plot in plots:
-            plots_html += f"""
-            <div class="card">
-                <h3>{plot['title']}</h3>
-                <p class="plot-desc">{plot['description']}</p>
-                <div class="img-container">
-                    <img src="data:image/png;base64,{plot['image']}" alt="{plot['title']}" />
-                </div>
-            </div>
-            """
-
-        timestamp = datetime.datetime.now().strftime("%B %d, %Y - %H:%M")
-
-        return f"""<!DOCTYPE html>
+        return f'''<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>{self.title}</title>
-    <style>
-        :root {{
-            --primary-color: {self.primary_color};
-            --secondary-color: {self.secondary_color};
-            --bg-color: {self.figure_facecolor};
-            --card-bg: {self.facecolor};
-            --grid-color: {self.grid_color};
-            --text-color: {self.text_color};
-        }}
-        body {{
-            font-family: 'Helvetica', 'Arial', sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 35px;
-            line-height: 1.5;
-        }}
-        .header {{
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 3px solid var(--primary-color);
-            padding-bottom: 18px;
-            margin-bottom: 30px;
-        }}
-        .header h1 {{
-            margin: 0;
-            font-size: 28px;
-            color: var(--text-color);
-            letter-spacing: -0.5px;
-        }}
-        .header-meta {{
-            margin: 6px 0 0 0;
-            color: #666666;
-            font-size: 13px;
-        }}
-        .module-logo {{
-            max-height: 65px;
-            max-width: 280px;
-            object-fit: contain;
-        }}
-        .logo-placeholder {{
-            width: 200px;
-            height: 50px;
-            border: 2px dashed var(--primary-color);
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #888888;
-            font-size: 11px;
-            background-color: var(--card-bg);
-        }}
-        .section-title {{
-            font-size: 19px;
-            font-weight: bold;
-            color: var(--primary-color);
-            margin-top: 35px;
-            margin-bottom: 15px;
-            border-left: 4px solid var(--secondary-color);
-            padding-left: 12px;
-            letter-spacing: -0.3px;
-        }}
-        .card {{
-            background: var(--card-bg);
-            border: 1px solid var(--grid-color);
-            border-radius: 8px;
-            padding: 22px;
-            margin-bottom: 25px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.03);
-        }}
-        .card h3 {{
-            margin-top: 0;
-            margin-bottom: 8px;
-            font-size: 16px;
-            color: var(--text-color);
-        }}
-        .plot-desc {{
-            margin-top: 0;
-            margin-bottom: 15px;
-            font-size: 13px;
-            color: #666666;
-        }}
-        .styled-table {{
-            width: 100%;
-            border-collapse: collapse;
-            margin: 10px 0;
-            font-size: 13px;
-        }}
-        .styled-table th {{
-            background-color: var(--primary-color);
-            color: #ffffff;
-            text-align: left;
-            padding: 10px 12px;
-            font-weight: bold;
-        }}
-        .styled-table td {{
-            padding: 9px 12px;
-            border-bottom: 1px solid var(--grid-color);
-        }}
-        .styled-table tr:nth-of-type(even) {{
-            background-color: rgba(0, 0, 0, 0.02);
-        }}
-        .img-container {{
-            text-align: center;
-        }}
-        .img-container img {{
-            max-width: 100%;
-            height: auto;
-            border-radius: 6px;
-        }}
-        .footer {{
-            margin-top: 50px;
-            padding-top: 15px;
-            border-top: 1px solid var(--grid-color);
-            text-align: center;
-            font-size: 12px;
-            color: #888888;
-        }}
-        @media print {{
-            body {{ padding: 0; }}
-            .card {{ page-break-inside: avoid; }}
-        }}
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{html.escape(self.title)}</title>
+<style>
+:root {{ --primary:{self.primary_color}; --secondary:{self.secondary_color}; --bg:{self.figure_facecolor};
+--card:{self.facecolor}; --grid:{self.grid_color}; --text:{self.text_color}; }}
+* {{ box-sizing:border-box; }}
+body {{ margin:0; padding:32px; background:var(--bg); color:var(--text);
+font-family:Arial,Helvetica,sans-serif; line-height:1.55; }}
+main {{ max-width:1100px; margin:0 auto; }}
+header {{ display:flex; justify-content:space-between; align-items:center; gap:24px;
+border-bottom:3px solid var(--primary); padding-bottom:20px; margin-bottom:28px; }}
+h1 {{ font-size:clamp(23px,4vw,32px); margin:0 0 6px; }}
+.meta {{ margin:0; color:#777; font-size:13px; }}
+.logo {{ max-width:220px; max-height:65px; object-fit:contain; }}
+.section {{ background:var(--card); border:1px solid var(--grid); border-left:4px solid var(--secondary);
+border-radius:8px; margin:13px 0; overflow:hidden; box-shadow:0 2px 6px rgba(0,0,0,.03); }}
+.section summary {{ list-style:none; cursor:pointer; display:flex; align-items:center; gap:14px;
+padding:16px 19px; font-weight:700; user-select:none; }}
+.section summary::-webkit-details-marker {{ display:none; }}
+.section summary::after {{ content:'+'; margin-left:auto; font-size:22px; color:var(--secondary); }}
+.section[open] summary::after {{ content:'−'; }}
+.section summary:hover {{ background:rgba(0,0,0,.025); }}
+.number {{ display:inline-flex; align-items:center; justify-content:center; flex:0 0 34px;
+height:30px; border-radius:6px; background:var(--primary); color:white; font-size:13px; }}
+.section-content {{ padding:2px 19px 20px; overflow-x:auto; border-top:1px solid var(--grid); }}
+.report-table {{ width:100%; border-collapse:collapse; margin-top:13px; font-size:13px; }}
+.report-table th {{ text-align:left; padding:10px; background:var(--primary); color:white; }}
+.report-table td {{ padding:9px 10px; border-bottom:1px solid var(--grid); }}
+.report-table tr:nth-child(even) {{ background:rgba(0,0,0,.025); }}
+.plot {{ margin:20px auto 8px; text-align:center; padding:16px 18px;
+border:1px solid var(--grid); border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,.025); }}
+.plot figcaption {{ font-weight:700; margin-bottom:9px; color:var(--text); }}
+.plot img {{ display:block; max-width:100%; height:auto; margin:0 auto; border-radius:5px; }}
+.empty {{ color:#777; font-style:italic; }}
+footer {{ text-align:center; margin-top:32px; padding-top:14px; border-top:1px solid var(--grid);
+font-size:12px; color:#888; }}
+@media(max-width:650px) {{ body {{ padding:15px; }} header {{ align-items:flex-start; }} .logo {{ max-width:100px; }} }}
+@media print {{ body {{ padding:0; }} .section {{ break-inside:avoid; }} .section:not([open]) .section-content {{ display:block; }} }}
+</style>
 </head>
-<body>
+<body><main>
+<header><div><h1>{html.escape(self.title)}</h1>
+<p class="meta">Generated by <strong>{html.escape(self.author)}</strong> · {html.escape(timestamp)}</p></div>{logo_html}</header>
+{''.join(section_html)}
+<footer>Report generated by ElevenOne · Exactly 11 sections</footer>
+</main></body></html>'''
 
-    <div class="header">
-        <div>
-            <h1>{self.title}</h1>
-            <p class="header-meta">Generated by <strong>{self.author}</strong> | {timestamp}</p>
-        </div>
-        {logo_html}
-    </div>
+    # ------------------------------------------------------------------
+    # PDF (ReportLab)
+    # ------------------------------------------------------------------
+    def _build_pdf(self, output_path):
+        """Build a standards-compliant PDF directly with ReportLab.
 
-    <div class="section-title">1. Executive Dataset Overview</div>
-    <div class="card" style="overflow-x: auto;">
-        {df_overview_html}
-    </div>
+        No PDF post-processing, external converter, or metadata rewriting is
+        performed. Keeping a single writer avoids cross-reference and trailer
+        inconsistencies between PDF libraries.
+        """
+        try:
+            from reportlab.lib import colors
+            from reportlab.lib.enums import TA_LEFT
+            from reportlab.lib.pagesizes import A4
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.units import mm
+            from reportlab.platypus import (
+                SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+                Image as RLImage, KeepTogether,
+            )
+        except ImportError as exc:
+            raise RuntimeError(
+                "PDF export requires ReportLab. Install it with: pip install reportlab"
+            ) from exc
 
-    <div class="section-title">2. Primary Descriptive Statistics</div>
-    <div class="card" style="overflow-x: auto;">
-        {df_stats}
-    </div>
+        import unicodedata
+        from pathlib import Path
 
-    <div class="section-title">3. Advanced Statistical Indicators</div>
-    <div class="card" style="overflow-x: auto;">
-        {df_ext_stats}
-    </div>
+        def pdf_metadata(value, fallback):
+            """Return conservative PDFDocEncoding-safe metadata text."""
+            value = str(value or fallback)
+            normalized = unicodedata.normalize("NFKD", value)
+            ascii_value = normalized.encode("ascii", "ignore").decode("ascii")
+            # PDF metadata should be short, plain text, and free of control chars.
+            ascii_value = " ".join(ascii_value.split())
+            return ascii_value[:200] or fallback
 
-    <div class="section-title">4. Pearson Correlation Matrix</div>
-    <div class="card" style="overflow-x: auto;">
-        {df_corr}
-    </div>
+        title_meta = pdf_metadata(self.title, "ElevenOne Scientific Report")
+        author_meta = pdf_metadata(self.author, "ElevenOne")
+        primary = colors.HexColor(self.primary_color)
+        secondary = colors.HexColor(self.secondary_color)
+        grid = colors.HexColor(self.grid_color)
+        text = colors.HexColor(self.text_color)
 
-    <div class="section-title">5. Data Visualizations & Analytics</div>
-    {plots_html}
+        styles = getSampleStyleSheet()
+        styles.add(ParagraphStyle(
+            name="ElevenOneReportTitle", parent=styles["Title"],
+            fontName="Helvetica-Bold", fontSize=19, leading=23,
+            alignment=TA_LEFT, textColor=text, spaceAfter=5,
+        ))
+        styles.add(ParagraphStyle(
+            name="ElevenOneSectionHeading", parent=styles["Heading2"],
+            fontName="Helvetica-Bold", fontSize=12, leading=15,
+            textColor=primary, spaceBefore=11, spaceAfter=8,
+            borderColor=secondary, borderWidth=1, borderPadding=5,
+        ))
+        styles.add(ParagraphStyle(
+            name="ElevenOneSmallCell", parent=styles["BodyText"],
+            fontName="Helvetica", fontSize=7.5, leading=9,
+        ))
+        styles.add(ParagraphStyle(
+            name="ElevenOneSmallCellHeader", parent=styles["BodyText"],
+            fontName="Helvetica-Bold", fontSize=7.5, leading=9,
+            textColor=colors.white,
+        ))
+        styles.add(ParagraphStyle(
+            name="ElevenOneReportMeta", parent=styles["BodyText"],
+            fontName="Helvetica", fontSize=8, textColor=colors.grey,
+            spaceAfter=12,
+        ))
 
-    <div class="footer">
-        Report generated by ElevenOne
-    </div>
+        destination = os.path.abspath(os.fspath(output_path))
+        os.makedirs(os.path.dirname(destination) or os.getcwd(), exist_ok=True)
+        doc = SimpleDocTemplate(
+            destination, pagesize=A4,
+            rightMargin=16 * mm, leftMargin=16 * mm,
+            topMargin=16 * mm, bottomMargin=17 * mm,
+            title=title_meta, author=author_meta,
+            subject="Scientific data analysis report",
+            creator="ElevenOne Report Generator",
+        )
 
-</body>
-</html>
-"""
+        story = [Paragraph(html.escape(str(self.title)), styles["ElevenOneReportTitle"])]
+        timestamp = datetime.datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z")
+        story.append(Paragraph(
+            f"Generated by <b>{html.escape(str(self.author))}</b> &middot; "
+            f"{html.escape(timestamp)}",
+            styles["ElevenOneReportMeta"],
+        ))
 
-    def generate(self, output_path: str, format_type: str = "html"):
-        """Generates the final report in HTML or PDF format."""
-        html_content = self._build_html_content()
-        format_type = format_type.lower()
-
-        if format_type == "html":
-            with open(output_path, "w", encoding="utf-8") as f:
-                f.write(html_content)
-            print(f"HTML report successfully generated at: {output_path}")
-
-        elif format_type == "pdf":
+        logo_bytes = self._get_logo_bytes()
+        if logo_bytes:
             try:
-                import pdfkit
-                pdfkit.from_string(html_content, output_path)
-                print(f"PDF report successfully generated at: {output_path}")
-            except ImportError:
-                try:
-                    from weasyprint import HTML
-                    HTML(string=html_content).write_pdf(output_path)
-                    print(f"PDF report successfully generated at: {output_path}")
-                except ImportError:
-                    raise RuntimeError("To export as PDF, please install 'weasyprint' or 'pdfkit' (with wkhtmltopdf).")
-        else:
+                logo_image = RLImage(io.BytesIO(logo_bytes), width=42 * mm, height=14 * mm,
+                                     kind="proportional")
+                logo_image.hAlign = "RIGHT"
+                story.extend([logo_image, Spacer(1, 5 * mm)])
+            except Exception as exc:
+                warnings.warn(f"Could not embed report logo in PDF: {exc}")
+
+        def dataframe_table(frame):
+            if frame is None or frame.empty:
+                return Paragraph("Not available for this dataset.", styles["BodyText"])
+
+            display = frame.copy().reset_index()
+            headers = [str(column) for column in display.columns]
+            rows = [[Paragraph(html.escape(header), styles["ElevenOneSmallCellHeader"])
+                     for header in headers]]
+            for row in display.itertuples(index=False, name=None):
+                rows.append([
+                    Paragraph(html.escape(self._safe_text(value)), styles["ElevenOneSmallCell"])
+                    for value in row
+                ])
+
+            available_width = A4[0] - 32 * mm
+            ncols = max(1, len(headers))
+            table = Table(
+                rows, repeatRows=1, hAlign="LEFT",
+                colWidths=[available_width / ncols] * ncols,
+            )
+            table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), primary),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("GRID", (0, 0), (-1, -1), 0.35, grid),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1),
+                 [colors.white, colors.HexColor("#f5f5f5")]),
+            ]))
+            return table
+
+        for number, (heading, frame, plots) in enumerate(self._report_sections(), start=1):
+            story.append(Paragraph(
+                f"{number}. {html.escape(heading)}",
+                styles["ElevenOneSectionHeading"],
+            ))
+            if frame is not None:
+                story.append(dataframe_table(frame))
+            elif plots:
+                for plot_title, image_bytes in plots:
+                    story.append(Paragraph(
+                        html.escape(plot_title), styles["Heading4"]
+                    ))
+                    try:
+                        image = RLImage(
+                            io.BytesIO(image_bytes), width=170 * mm,
+                            height=110 * mm, kind="proportional",
+                        )
+                        image.hAlign = "CENTER"
+                        story.append(image)
+                    except Exception as exc:
+                        warnings.warn(f"Could not embed a plot in the PDF: {exc}")
+                        story.append(Paragraph(
+                            "This plot could not be embedded.", styles["BodyText"]
+                        ))
+                    story.append(Spacer(1, 3 * mm))
+            else:
+                story.append(Paragraph(
+                    "This analysis is not available for the current dataset.",
+                    styles["BodyText"],
+                ))
+            story.append(Spacer(1, 3 * mm))
+
+        def draw_page(canvas, document):
+            canvas.saveState()
+            # Set metadata on the PDF document itself; ReportLab writes the
+            # Info dictionary and cross-reference structure when build() closes.
+            canvas.setTitle(title_meta)
+            canvas.setAuthor(author_meta)
+            canvas.setSubject("Scientific data analysis report")
+            canvas.setCreator("ElevenOne Report Generator")
+            canvas.setProducer("ReportLab")
+            canvas.setFont("Helvetica", 8)
+            canvas.setFillColor(colors.grey)
+            canvas.drawCentredString(A4[0] / 2, 9 * mm, str(document.page))
+            canvas.restoreState()
+
+        # One writer, one output file: no pypdf/PyPDF2 rewrite step.
+        doc.build(story, onFirstPage=draw_page, onLaterPages=draw_page)
+
+        # Basic sanity check without modifying the generated file.
+        with open(destination, "rb") as pdf_file:
+            header = pdf_file.read(8)
+        if not header.startswith(b"%PDF-"):
+            try:
+                os.remove(destination)
+            except OSError:
+                pass
+            raise RuntimeError("ReportLab did not produce a valid PDF header.")
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+    def generate(self, output_path: str, format_type: str = "html"):
+        format_type = str(format_type).lower().strip()
+        if format_type not in ("html", "pdf"):
             raise ValueError(f"Format '{format_type}' is not supported. Use 'html' or 'pdf'.")
+        if format_type == "html":
+            content = self._build_html_content()
+            with open(output_path, "w", encoding="utf-8") as file:
+                file.write(content)
+        else:
+            self._build_pdf(output_path)
+        print(f"{format_type.upper()} report successfully generated at: {output_path}")
+        return output_path
 
 
-def generate_report(data_obj, output_path: str, format_type: str = "html", logo_path: str = DEFAULT_LOGO_URL, title: str = "Comprehensive Scientific Data Report", author: str = None):
-    """Direct function call to trigger scientific report generation."""
-    reporter = ReportGenerator(data_obj, logo_path=logo_path, title=title, author=author)
-    reporter.generate(output_path, format_type=format_type)
+def generate_report(
+    data_obj,
+    output_path: str,
+    format_type: str = "html",
+    logo_path: str = DEFAULT_LOGO_URL,
+    title: str = "Comprehensive Scientific Data Report",
+    author: str = None,
+):
+    """Convenience function to generate an HTML or PDF report."""
+    reporter = ReportGenerator(
+        data_obj, logo_path=logo_path, title=title, author=author,
+    )
+    return reporter.generate(output_path, format_type=format_type)

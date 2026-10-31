@@ -103,3 +103,10 @@ L    = Unit(VOLUME, "L", 0.001)
 mL   = Unit(VOLUME, "mL", 1e-6)
 m3   = Unit(VOLUME, "m³", 1.0)
 gal  = Unit(VOLUME, "gal", 0.003785411784)
+
+# --- Angulares ---
+rad  = Unit(ANGULAR, "rad", 1.0)
+deg  = Unit(ANGULAR, "deg", 0.0174533)
+
+# --- Otros ---
+counts = Unit(DIMENSIONLESS, "counts", 1)

@@ -1,149 +1,250 @@
+import ast
 import re
 import pandas as pd
 import numpy as np
+
 from .data import Data
+from .unit import Quantity, Unit
 from . import basic_units
 
+
 class Loader:
-    """Utility class to dynamically extract units from column names and cell data, 
-    returning a fully-functional Data object."""
+    """Carga CSV/Excel y asocia automáticamente columnas de incertidumbre."""
 
     def __init__(self):
-        # Build a dynamic registry of available units from basic_units module, 
-        # sorted by symbol length descending to match longer units first (e.g., 'mbar' before 'm')
         self.unit_registry = {}
         for attr_name in dir(basic_units):
             attr = getattr(basic_units, attr_name)
-            if hasattr(attr, 'symbol'):
+            if isinstance(attr, Unit):
                 self.unit_registry[attr.symbol] = attr
-        
-        # Sort symbols by length (descending) to avoid partial replacements (e.g. 'm' inside 'mm')
-        self.sorted_symbols = sorted(self.unit_registry.keys(), key=len, reverse=True)
+                # También permite usar el nombre Python de la unidad.
+                self.unit_registry.setdefault(attr_name, attr)
 
-    def _find_unit_in_string(self, text: str):
-        """Searches for a known unit symbol inside a string (e.g. 'Tiempo (s)' or '20 kPa')."""
+        self.sorted_symbols = sorted(self.unit_registry, key=len, reverse=True)
+
+    def _parse_unit_expression(self, expression):
+        """Evalúa expresiones de unidades sin ejecutar código arbitrario."""
+        expr = expression.strip().replace("·", "*").replace("⋅", "*")
+        expr = expr.replace("²", "**2").replace("³", "**3")
+        expr = expr.replace("^", "**").replace(" ", "")
+        if not expr:
+            return None
+
+        # AST restringido: nombres registrados, 1, multiplicación, división y potencias.
+        try:
+            tree = ast.parse(expr, mode="eval")
+        except SyntaxError:
+            return None
+
+        def evaluate(node):
+            if isinstance(node, ast.Expression):
+                return evaluate(node.body)
+            if isinstance(node, ast.Name):
+                return self.unit_registry.get(node.id)
+            if isinstance(node, ast.Constant) and node.value == 1:
+                return 1
+            if isinstance(node, ast.BinOp):
+                left, right = evaluate(node.left), evaluate(node.right)
+                if left is None or right is None:
+                    return None
+                if isinstance(node.op, ast.Mult):
+                    return left * right
+                if isinstance(node.op, ast.Div):
+                    if left == 1:
+                        return 1 / right if isinstance(right, Unit) else None
+                    return left / right
+                if isinstance(node.op, ast.Pow) and isinstance(right, (int, float)):
+                    return left ** right
+            if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+                value = evaluate(node.operand)
+                return -value if isinstance(value, (int, float)) else None
+            if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+                return node.value
+            return None
+
+        result = evaluate(tree)
+        return result if isinstance(result, Unit) else None
+
+    def _find_unit_in_string(self, text):
+        """Extrae unidades de nombres/celdas: 'Tiempo (s)', 'Velocidad [m/s]', '2 m/s'."""
         if not isinstance(text, str):
             return None, text
+        cleaned = text.strip()
 
-        cleaned_text = text.strip()
-        
-        # 1. Look inside parentheses or brackets first (e.g., "Velocity (m/s)" -> "m/s")
-        match_brackets = re.search(r'[\(\[\{](.*?)[\)\]\}]', cleaned_text)
-        if match_brackets:
-            inner_content = match_brackets.group(1).strip()
-            if inner_content in self.unit_registry:
-                # Remove the bracketed unit part from the original name
-                base_name = re.sub(r'[\(\[\{].*?[\)\]\}]', '', cleaned_text).strip()
-                return self.unit_registry[inner_content], base_name
+        # Unidad entre delimitadores. Se intenta de derecha a izquierda para
+        # permitir nombres que contengan paréntesis no relacionados con unidades.
+        for match in reversed(list(re.finditer(r"[\(\[\{]([^\)\]\}]+)[\)\]\}]", cleaned))):
+            unit = self._parse_unit_expression(match.group(1))
+            if unit is not None:
+                base = (cleaned[:match.start()] + cleaned[match.end():]).strip()
+                return unit, base
 
-        # 2. Look for space-separated unit at the end or standalone (e.g., "20 kPa")
-        for sym in self.sorted_symbols:
-            # Match symbol as a distinct token or ending pattern
-            pattern = rf'(.*?)\s+({re.escape(sym)})$'
-            match = re.match(pattern, cleaned_text, re.IGNORECASE)
+        # Unidad al final separada por espacio: "velocidad m/s" o "12 kg·m/s²".
+        # Los exponentes Unicode más habituales se traducen a potencias.
+        normalized = cleaned.replace("²", "**2").replace("³", "**3")
+        for split in range(len(normalized) - 1, 0, -1):
+            if not normalized[split].isspace():
+                continue
+            candidate = normalized[split:].strip()
+            unit = self._parse_unit_expression(candidate)
+            if unit is not None:
+                return unit, normalized[:split].strip()
+        return None, cleaned
+
+    def _parse_error_column_name(self, col_name):
+        """Devuelve (nombre_base, unidad_error) si el nombre es una incertidumbre."""
+        cleaned = str(col_name).strip()
+        suffix = r"(?:err|error|unc|uncertainty|uncert|sigma)"
+
+        # Caso habitual: tiempo_err (s), tiempo_error [ms], etc.
+        match = re.match(
+            rf"^(.*?)[\s_-]+{suffix}\s*(?:[\(\[\{{](.*?)[\)\]\}}])?$",
+            cleaned, re.IGNORECASE
+        )
+        if match:
+            base = match.group(1).strip()
+            unit = self._parse_unit_expression(match.group(2)) if match.group(2) else None
+            if unit is None:
+                unit, base = self._find_unit_in_string(base)
+            return base, unit
+
+        # También admite tiempo (s)_err o tiempo [s]_err.
+        match = re.match(rf"^(.*?)[\s_-]+{suffix}$", cleaned, re.IGNORECASE)
+        if match:
+            base_with_unit = match.group(1).strip()
+            unit, base = self._find_unit_in_string(base_with_unit)
+            return base, unit
+
+        # Formas tiempo (err) y tiempo [err].
+        unit, base = self._find_unit_in_string(cleaned)
+        for pattern in (rf"^(.*?)\s*\({suffix}\)$", rf"^(.*?)\s*\[{suffix}\]$"):
+            match = re.match(pattern, base, re.IGNORECASE)
             if match:
-                base_val_str = match.group(1).strip()
-                unit_obj = self.unit_registry[sym]
-                return unit_obj, base_val_str
+                return match.group(1).strip(), unit
+        return None, None
 
-        return None, cleaned_text
-
-    def parse_column(self, col_name: str, series: pd.Series):
-        """Analyzes a pandas Series and its column name to extract units and convert to Quantity or appropriate array."""
-        clean_col_name = col_name
-        detected_unit, base_name = self._find_unit_in_string(col_name)
+    def parse_column(self, col_name, series):
+        clean_name = str(col_name).strip()
+        detected_unit, base_name = self._find_unit_in_string(clean_name)
         if detected_unit is not None:
-            clean_col_name = base_name
+            clean_name = base_name
 
-        # Check if data values themselves contain units as strings (e.g., ["10 m", "20 m"])
-        numeric_vals = []
-        data_unit = detected_unit
-        has_string_units = False
+        values = []
+        unit_from_cells = None
+        all_numeric = True
 
-        if series.dtype == object or pd.api.types.is_string_dtype(series):
-            parsed_nums = []
-            unit_found_in_data = None
-            success = True
-
-            for val in series:
-                if pd.isna(val):
-                    parsed_nums.append(np.nan)
-                    continue
-                
-                if isinstance(val, (int, float, np.number)):
-                    parsed_nums.append(float(val))
-                    continue
-
-                if isinstance(val, str):
-                    u_obj, clean_val_str = self._find_unit_in_string(val)
-                    if u_obj is not None:
-                        if unit_found_in_data is None:
-                            unit_found_in_data = u_obj
-                        elif unit_found_in_data.symbol != u_obj.symbol:
-                            success = False # Mixed units inside column
-                            break
-                    
-                    try:
-                        parsed_nums.append(float(clean_val_str))
-                    except ValueError:
-                        success = False
-                        break
-                else:
-                    success = False
+        for value in series:
+            if pd.isna(value):
+                values.append(np.nan)
+                continue
+            if isinstance(value, (int, float, np.number)):
+                values.append(float(value))
+                continue
+            if isinstance(value, str):
+                cell_unit, numeric_text = self._find_unit_in_string(value)
+                try:
+                    number = float(numeric_text)
+                except (TypeError, ValueError):
+                    all_numeric = False
                     break
+                if cell_unit is not None:
+                    if unit_from_cells is None:
+                        unit_from_cells = cell_unit
+                    elif cell_unit.dimension != unit_from_cells.dimension:
+                        raise ValueError(f"Unidades incompatibles en la columna '{col_name}'.")
+                    else:
+                        number *= cell_unit.factor / unit_from_cells.factor
+                values.append(number)
+            else:
+                all_numeric = False
+                break
 
-            if success and len(parsed_nums) > 0:
-                numeric_vals = np.asarray(parsed_nums)
-                if unit_found_in_data is not None:
-                    data_unit = unit_found_in_data
-                has_string_units = True
+        if not all_numeric:
+            return clean_name, series.to_numpy()
 
-        # If values are natively numeric
-        if not has_string_units:
-            try:
-                numeric_vals = pd.to_numeric(series).to_numpy()
-            except (ValueError, TypeError):
-                # If conversion fails completely, treat as plain object/string array (e.g., text columns)
-                return clean_col_name, series.to_numpy()
-
-        # If we successfully parsed numbers and identified a unit, return a Quantity
-        if data_unit is not None and len(numeric_vals) > 0:
-            return clean_col_name, numeric_vals * data_unit
-        
-        # Otherwise return standard numeric or text array
-        return clean_col_name, numeric_vals
+        unit = detected_unit or unit_from_cells
+        arr = np.asarray(values, dtype=float)
+        return clean_name, arr * unit if unit is not None else arr
 
 
-def load_data(filepath: str, sheet_name=0, **kwargs) -> Data:
-    """
-    Loads a CSV or Excel file and returns a Data object with automatic unit detection.
-    
-    Parameters:
-    -----------
-    filepath : str
-        Path to the .csv, .xls, or .xlsx file.
-    sheet_name : str or int, optional
-        Sheet name or index if loading an Excel file.
-    **kwargs : dict
-        Additional arguments passed to pd.read_csv or pd.read_excel.
-    """
+def load_data(filepath, sheet_name=0, **kwargs):
+    """Carga CSV/Excel, reconoce incertidumbres y devuelve un objeto Data."""
     loader = Loader()
+    path = str(filepath).lower()
 
-    # Determine file format based on extension
-    if filepath.endswith('.csv'):
+    if path.endswith(".csv"):
         df = pd.read_csv(filepath, **kwargs)
-    elif filepath.endswith(('.xls', '.xlsx', '.xlsm')):
+    elif path.endswith((".xls", ".xlsx", ".xlsm", ".xlsb")):
         df = pd.read_excel(filepath, sheet_name=sheet_name, **kwargs)
     else:
-        # Fallback trying CSV first
         try:
             df = pd.read_csv(filepath, **kwargs)
         except Exception:
             df = pd.read_excel(filepath, sheet_name=sheet_name, **kwargs)
 
+    parsed = {}
+    errors = {}
+    original_to_clean = {}
+
+    for original_name in df.columns:
+        original_name = str(original_name)
+        clean_name, parsed_data = loader.parse_column(original_name, df[original_name])
+        parsed[original_name] = (clean_name, parsed_data)
+        original_to_clean[original_name] = clean_name
+
+    # Primero se identifican todas las columnas de error.
+    for original_name, (clean_name, values) in parsed.items():
+        base_name, error_unit = loader._parse_error_column_name(original_name)
+        if base_name is None:
+            continue
+        # El nombre de la magnitud puede llevar unidad en su propio encabezado.
+        _, clean_base = loader._find_unit_in_string(base_name)
+        if clean_base != base_name:
+            base_name = clean_base
+        errors[base_name] = (values, error_unit, original_name)
+
     data_dict = {}
-    for col in df.columns:
-        clean_name, parsed_data = loader.parse_column(str(col), df[col])
-        data_dict[clean_name] = parsed_data
+    for original_name, (clean_name, values) in parsed.items():
+        base_name, _ = loader._parse_error_column_name(original_name)
+        if base_name is not None:
+            continue
+
+        error_entry = errors.get(clean_name)
+        if error_entry is None:
+            data_dict[clean_name] = values
+            continue
+
+        error_values, error_unit, error_col = error_entry
+        if isinstance(error_values, Quantity):
+            error_quantity = error_values
+        elif error_unit is not None:
+            error_quantity = Quantity(error_values, error_unit)
+        else:
+            error_quantity = None
+
+        if isinstance(values, Quantity):
+            if error_quantity is not None:
+                converted_error = error_quantity.convert_to(values.unit)
+                error_array = converted_error.value
+            else:
+                # Si no se especificó unidad en la columna _err, se entiende
+                # que está expresada en la unidad de la magnitud.
+                error_array = np.asarray(error_values, dtype=float)
+            data_dict[clean_name] = Quantity(values.value, values.unit, error_array)
+        else:
+            # Si la columna principal no declara unidad pero _err sí, se
+            # interpreta que ambas están expresadas en esa unidad.
+            if error_quantity is not None:
+                unit = error_quantity.unit
+                error_array = error_quantity.value
+            else:
+                unit = getattr(basic_units, "counts", None)
+                if unit is None:
+                    raise ValueError(
+                        f"La columna '{error_col}' tiene incertidumbre, pero "
+                        f"'{clean_name}' no tiene unidad y basic_units.counts no existe."
+                    )
+                error_array = np.asarray(error_values, dtype=float)
+            data_dict[clean_name] = Quantity(values, unit, error_array)
 
     return Data(data_dict)

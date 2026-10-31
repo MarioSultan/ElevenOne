@@ -5,31 +5,28 @@ from matplotlib.colors import LinearSegmentedColormap
 from .unit import Quantity, Unit
 
 class Data:
-    # =========================================================================
-    # ULTRA-MODERN SCIENTIFIC BRAND IDENTITY & CONFIGURATION
-    # =========================================================================
-    _primary_color = "#00ccff"       # Primary Cyan (Main graphs, lines, bars, histograms, scatter)
-    _secondary_color = "#ff2ad4"     # Secondary Magenta/Pink (Trendlines, fits, accents)
-    _facecolor = "#fcfcfc"           # Soft off-white/grey axis background
-    _figure_facecolor = "#ffffff"    # Clean pure white outer canvas
-    _grid_color = "#ebebeb"          # Ultra-subtle grid lines
-    _text_color = "#1a1a1a"          # Deep charcoal for high readability
+    _primary_color = "#00ccff"
+    _secondary_color = "#ff2ad4"
+    _facecolor = "#fcfcfc"
+    _figure_facecolor = "#ffffff"
+    _grid_color = "#ebebeb"
+    _text_color = "#1a1a1a"
+    _error_color = "#888888"
 
     @classmethod
     def set_theme(cls, primary="#00ccff", secondary="#ff2ad4", facecolor="#fcfcfc", 
-                  figure_facecolor="#ffffff", grid_color="#ebebeb", text_color="#1a1a1a"):
-        """Updates the global brand identity theme for all plots."""
+                  figure_facecolor="#ffffff", grid_color="#ebebeb", text_color="#1a1a1a", error_color="#888888"):
         cls._primary_color = primary
         cls._secondary_color = secondary
         cls._facecolor = facecolor
         cls._figure_facecolor = figure_facecolor
         cls._grid_color = grid_color
         cls._text_color = text_color
+        cls._error_color = error_color
         cls._apply_global_rc_params()
 
     @classmethod
     def _apply_global_rc_params(cls):
-        """Forces Matplotlib to drop its default look and adopt a modern design system."""
         plt.rcParams.update({
             'font.family': 'sans-serif',
             'font.sans-serif': ['Helvetica', 'Arial', 'DejaVu Sans', 'Liberation Sans'],
@@ -69,19 +66,174 @@ class Data:
         self.columns = list(self.dict.keys())
 
     def __getitem__(self, key):
-        """Permite acceder a una columna individual o crear un nuevo objeto Data usando una lista/tupla de columnas."""
-        if isinstance(key, (list, tuple)):
+        if isinstance(key, str):
+            if key not in self.dict:
+                raise KeyError(f"Column '{key}' not found in Data.")
+            return self.dict[key]
+
+        if isinstance(key, (list, tuple)) and len(key) > 0 and all(isinstance(col, str) for col in key):
             sub_dict = {}
             for col in key:
                 if col not in self.dict:
                     raise KeyError(f"Column '{col}' not found in Data.")
                 sub_dict[col] = self.dict[col]
             return Data(sub_dict)
+
+        is_bool_array = isinstance(key, np.ndarray) and key.dtype == bool
+        is_bool_list = isinstance(key, (list, tuple)) and len(key) == self._length and all(isinstance(x, (bool, np.bool_)) for x in key)
+
+        if is_bool_array or is_bool_list:
+            mask = np.asarray(key)
+            if len(mask) != self._length:
+                raise ValueError(f"Boolean mask length ({len(mask)}) does not match data length ({self._length}).")
+            
+            filtered_dict = {}
+            for col, val in self.dict.items():
+                if isinstance(val, Quantity):
+                    filtered_dict[col] = Quantity(val.value[mask], val.unit, val.error[mask])
+                elif isinstance(val, np.ndarray):
+                    filtered_dict[col] = val[mask]
+                else:
+                    filtered_dict[col] = np.asarray(val)[mask]
+            
+            return Data(filtered_dict)
+
+        is_int = isinstance(key, (int, np.integer))
+        is_slice = isinstance(key, slice)
+        is_int_array = isinstance(key, np.ndarray) and np.issubdtype(key.dtype, np.integer)
+        is_int_list = isinstance(key, (list, tuple)) and (len(key) == 0 or all(isinstance(x, (int, np.integer)) for x in key))
+
+        if is_int:
+            indices = [key]
+        elif is_slice:
+            indices = list(range(self._length)[key])
+        elif is_int_array or is_int_list:
+            indices = list(key)
         else:
-            return self.dict[key]
+            indices = None
+
+        if indices is not None:
+            filtered_dict = {}
+            for col, val in self.dict.items():
+                if isinstance(val, Quantity):
+                    filtered_dict[col] = Quantity(val.value[indices], val.unit, val.error[indices])
+                elif isinstance(val, np.ndarray):
+                    filtered_dict[col] = val[indices]
+                else:
+                    filtered_dict[col] = np.asarray(val)[indices]
+            return Data(filtered_dict)
+
+        raise TypeError("Invalid key type for indexing Data.")
+
+    def query(self, expr: str):
+        local_dict = {}
+        for col_name, val in self.dict.items():
+            if isinstance(val, Quantity):
+                local_dict[col_name] = val.value
+            else:
+                local_dict[col_name] = val
+
+        try:
+            mask = eval(expr, {"np": np}, local_dict)
+        except Exception as e:
+            raise ValueError(f"Error evaluating query expression '{expr}': {e}")
+
+        return self[mask]
+
+    def head(self, n: int = 5):
+        n = min(max(0, n), self._length)
+        return self[np.arange(n)]
+
+    def tail(self, n: int = 5):
+        n = min(max(0, n), self._length)
+        start = max(0, self._length - n)
+        return self[np.arange(start, self._length)]
+
+    def sample(self, n: int = None, frac: float = None, replace: bool = False, random_state: int = None):
+        if random_state is not None:
+            np.random.seed(random_state)
+        
+        if n is None and frac is None:
+            n = 1
+        elif frac is not None:
+            if not (0.0 <= frac <= 1.0):
+                raise ValueError("frac must be between 0.0 and 1.0")
+            n = int(round(self._length * frac))
+        
+        if not replace and n > self._length:
+            raise ValueError("Cannot sample larger than population when replace=False")
+            
+        indices = np.random.choice(self._length, size=n, replace=replace)
+        return self[indices]
+
+    def sort_values(self, by, ascending=True):
+        if isinstance(by, str):
+            by = [by]
+        
+        for col in by:
+            if col not in self.dict:
+                raise KeyError(f"Column '{col}' not found in Data.")
+        
+        primary_col = by[0]
+        val = self.dict[primary_col]
+        arr = val.value if isinstance(val, Quantity) else val
+        
+        sorted_indices = np.argsort(arr)
+        if not ascending:
+            sorted_indices = sorted_indices[::-1]
+            
+        return self[sorted_indices]
+
+    def drop_duplicates(self, subset=None, keep='first'):
+        if subset is None:
+            cols = self.columns
+        elif isinstance(subset, str):
+            cols = [subset]
+        else:
+            cols = list(subset)
+            
+        for col in cols:
+            if col not in self.dict:
+                raise KeyError(f"Column '{col}' not found in Data.")
+                
+        columns_data = [
+            (self.dict[c].value if isinstance(self.dict[c], Quantity) else self.dict[c])
+            for c in cols
+        ]
+        
+        seen = set()
+        keep_indices = []
+        
+        if keep == 'first':
+            for i in range(self._length):
+                row_key = tuple(col_data[i] for col_data in columns_data)
+                if row_key not in seen:
+                    seen.add(row_key)
+                    keep_indices.append(i)
+        elif keep == 'last':
+            last_seen = {}
+            for i in range(self._length):
+                row_key = tuple(col_data[i] for col_data in columns_data)
+                last_seen[row_key] = i
+            keep_indices = sorted(list(last_seen.values()))
+        elif keep is False:
+            from collections import Counter
+            row_keys = [tuple(col_data[i] for col_data in columns_data) for i in range(self._length)]
+            counts = Counter(row_keys)
+            keep_indices = [i for i, rk in enumerate(row_keys) if counts[rk] == 1]
+        else:
+            raise ValueError("keep must be 'first', 'last', or False")
+            
+        return self[np.array(keep_indices)]
+
+    def rename(self, columns: dict):
+        new_dict = {}
+        for k, v in self.dict.items():
+            new_key = columns.get(k, k)
+            new_dict[new_key] = v
+        return Data(new_dict)
 
     def __setitem__(self, key, value):
-        """Permite añadir o modificar columnas respetando el motor de unidades y longitudes."""
         if isinstance(value, Quantity):
             col_data = value
         elif isinstance(value, (list, np.ndarray, tuple)):
@@ -99,7 +251,6 @@ class Data:
         self.columns = list(self.dict.keys())
 
     def __delitem__(self, key):
-        """Permite eliminar columnas usando del df['columna']."""
         if key in self.dict:
             del self.dict[key]
             self.columns = list(self.dict.keys())
@@ -109,13 +260,12 @@ class Data:
             raise KeyError(f"Column '{key}' not found in Data.")
 
     def copy(self):
-        """Devuelve una copia profunda del objeto Data (al estilo de pandas.DataFrame.copy)."""
         new_dict = {}
         for k, v in self.dict.items():
             if isinstance(v, Quantity):
-                # Copia profunda del array interno manteniendo la unidad
-                val_copy = v.value.copy() if hasattr(v, 'value') else v.value
-                new_dict[k] = Quantity(val_copy, v.unit)
+                val_copy = v.value.copy() if hasattr(v.value, 'copy') else v.value
+                err_copy = v.error.copy() if hasattr(v.error, 'copy') else v.error
+                new_dict[k] = Quantity(val_copy, v.unit, err_copy)
             elif isinstance(v, np.ndarray):
                 new_dict[k] = v.copy()
             else:
@@ -134,6 +284,9 @@ class Data:
         for col_name, col_data in self.dict.items():
             if isinstance(col_data, Quantity):
                 representation_dict[f"{col_name} [{col_data.unit.symbol}]"] = col_data.value
+                # La incertidumbre se muestra siempre, incluso si vale cero:
+                # así la estructura de la tabla no depende de los datos.
+                representation_dict[f"{col_name}_err"] = col_data.error
             else:
                 representation_dict[col_name] = col_data
         return pd.DataFrame(representation_dict)
@@ -186,7 +339,7 @@ class Data:
         return DataStatsResult(res)
 
     def median(self):
-        res = {k: (Quantity(np.median(v.value), v.unit) if isinstance(v, Quantity) else np.median(v)) for k, v in self._numeric_columns().items()}
+        res = {k: (Quantity(np.median(v.value), v.unit, np.median(v.error)) if isinstance(v, Quantity) else np.median(v)) for k, v in self._numeric_columns().items()}
         return DataStatsResult(res)
 
     def min(self):
@@ -211,7 +364,7 @@ class Data:
         return pd.DataFrame(data_for_corr).corr()
 
     # =========================================================================
-    # NEXT-GEN SCIENTIFIC PLOTTING ENGINE
+    # PLOTTING METHODS CON SOPORTE DE BARRAS DE ERROR
     # =========================================================================
 
     def _get_plot_series(self, col_name: str):
@@ -221,11 +374,13 @@ class Data:
         col_data = self.dict[col_name]
         if isinstance(col_data, Quantity):
             values = col_data.value
+            errors = col_data.error
             label = f"{col_name} [{col_data.unit.symbol}]"
         else:
             values = col_data
+            errors = np.zeros_like(values, dtype=float)
             label = col_name
-        return values, label
+        return values, errors, label
 
     def _init_plot_figure(self, ax, figsize):
         if ax is None:
@@ -255,34 +410,55 @@ class Data:
             ax.set_title(title, fontsize=13, fontweight='bold', color=self._text_color, pad=15, loc='left')
 
     def plot(self, x: str, y: str, ax=None, figsize=(8, 4.5), color=None, linestyle='-', linewidth=2.2, 
-             marker='o', markersize=4.5, fill_area=True, title=None, xlabel=None, ylabel=None, grid=True, **kwargs):
-        x_vals, x_label = self._get_plot_series(x)
-        y_vals, y_label = self._get_plot_series(y)
-        fig, ax = self._init_plot_figure(ax, figsize)
+             marker='o', markersize=True, fill_area=True, sort_x=True, title=None, xlabel=None, ylabel=None, grid=True, **kwargs):
+        x_vals, x_errs, x_label = self._get_plot_series(x)
+        y_vals, y_errs, y_label = self._get_plot_series(y)
+        
+        if sort_x:
+            sort_idx = np.argsort(x_vals)
+            x_vals = x_vals[sort_idx]
+            x_errs = x_errs[sort_idx]
+            y_vals = y_vals[sort_idx]
+            y_errs = y_errs[sort_idx]
 
+        fig, ax = self._init_plot_figure(ax, figsize)
         line_color = color if color is not None else self._primary_color
         
         if fill_area:
             ax.fill_between(x_vals, y_vals, color=line_color, alpha=0.08, zorder=1)
 
+        if markersize:
+            markersize = 0 if len(x_vals) > 25 else 4.5
+
+        if np.any(y_errs != 0) or np.any(x_errs != 0):
+            ax.errorbar(x_vals, y_vals, yerr=y_errs if np.any(y_errs!=0) else None, 
+                        xerr=x_errs if np.any(x_errs!=0) else None, fmt='none', ecolor=self._error_color, 
+                        elinewidth=1.2, capsize=3, zorder=2)
+
         ax.plot(x_vals, y_vals, color=line_color, linestyle=linestyle, linewidth=linewidth, 
                 marker=marker, markersize=markersize, zorder=3, markeredgecolor='white', markeredgewidth=0.8, **kwargs)
 
         self._format_labels(ax, xlabel or x_label, ylabel or y_label, title)
-        if grid: self._apply_grid(ax)
+        if grid: 
+            self._apply_grid(ax)
 
         fig.tight_layout()
         return fig, ax
 
     def scatter(self, x: str, y: str, ax=None, figsize=(8, 4.5), color=None, s=45, alpha=1, 
                 marker='o', fit=False, title=None, xlabel=None, ylabel=None, grid=True, **kwargs):
-        x_vals, x_label = self._get_plot_series(x)
-        y_vals, y_label = self._get_plot_series(y)
+        x_vals, x_errs, x_label = self._get_plot_series(x)
+        y_vals, y_errs, y_label = self._get_plot_series(y)
         fig, ax = self._init_plot_figure(ax, figsize)
 
         scatter_color = color if color is not None else self._primary_color
-        ax.scatter(x_vals, y_vals, color=scatter_color, s=s, alpha=alpha, marker=marker, 
-                   edgecolors='white', linewidths=.5, zorder=3, **kwargs)
+        
+        if np.any(y_errs != 0) or np.any(x_errs != 0):
+            ax.errorbar(x_vals, y_vals, yerr=y_errs if np.any(y_errs!=0) else None, 
+                        xerr=x_errs if np.any(x_errs!=0) else None, fmt='none', ecolor=self._error_color, 
+                        elinewidth=1.2, capsize=3, zorder=2)
+
+        ax.scatter(x_vals, y_vals, color=scatter_color, s=s, alpha=alpha, marker=marker, zorder=3, **kwargs)
 
         if fit and len(x_vals) > 1:
             m, b = np.polyfit(x_vals, y_vals, 1)
@@ -299,19 +475,18 @@ class Data:
 
     def errorbar(self, x: str, y: str, yerr: str = None, xerr: str = None, ax=None, figsize=(8, 4.5), 
                  color=None, ecolor=None, capsize=4, title=None, xlabel=None, ylabel=None, grid=True, **kwargs):
-        x_vals, x_label = self._get_plot_series(x)
-        y_vals, y_label = self._get_plot_series(y)
+        x_vals, internal_xerr, x_label = self._get_plot_series(x)
+        y_vals, internal_yerr, y_label = self._get_plot_series(y)
         
-        yerr_vals = self._get_plot_series(yerr)[0] if yerr else None
-        xerr_vals = self._get_plot_series(xerr)[0] if xerr else None
+        yerr_vals = self._get_plot_series(yerr)[0] if yerr else (internal_yerr if np.any(internal_yerr!=0) else None)
+        xerr_vals = self._get_plot_series(xerr)[0] if xerr else (internal_xerr if np.any(internal_xerr!=0) else None)
 
         fig, ax = self._init_plot_figure(ax, figsize)
         main_color = color if color is not None else self._primary_color
         err_color = ecolor if ecolor is not None else self._secondary_color
 
         ax.errorbar(x_vals, y_vals, yerr=yerr_vals, xerr=xerr_vals, fmt='o', color=main_color, 
-                    ecolor=err_color, elinewidth=1.5, capsize=capsize, capthick=1.5, 
-                    markeredgecolor='white', markeredgewidth=0.8, zorder=3, **kwargs)
+                    ecolor=err_color, elinewidth=1.5, capsize=capsize, capthick=1.5, zorder=3, **kwargs)
 
         self._format_labels(ax, xlabel or x_label, ylabel or y_label, title)
         if grid: self._apply_grid(ax)
@@ -321,12 +496,15 @@ class Data:
 
     def bar(self, x: str, y: str, ax=None, figsize=(8, 4.5), color=None, width=0.6, 
             title=None, xlabel=None, ylabel=None, grid=True, **kwargs):
-        x_vals, x_label = self._get_plot_series(x)
-        y_vals, y_label = self._get_plot_series(y)
+        x_vals, _, x_label = self._get_plot_series(x)
+        y_vals, y_errs, y_label = self._get_plot_series(y)
         fig, ax = self._init_plot_figure(ax, figsize)
 
         bar_color = color if color is not None else self._primary_color
-        ax.bar(x_vals, y_vals, color=bar_color, width=width, edgecolor='none', zorder=3, **kwargs)
+        if np.any(y_errs != 0):
+            ax.bar(x_vals, y_vals, yerr=y_errs, capsize=3, ecolor=self._secondary_color, color=bar_color, width=width, edgecolor='none', zorder=3, **kwargs)
+        else:
+            ax.bar(x_vals, y_vals, color=bar_color, width=width, edgecolor='none', zorder=3, **kwargs)
 
         self._format_labels(ax, xlabel or x_label, ylabel or y_label, title)
         if grid: self._apply_grid(ax, axis='y')
@@ -336,7 +514,7 @@ class Data:
 
     def hist(self, column: str, bins=12, ax=None, figsize=(8, 4.5), color=None, 
              title=None, xlabel=None, ylabel=None, grid=True, **kwargs):
-        vals, label = self._get_plot_series(column)
+        vals, _, label = self._get_plot_series(column)
         fig, ax = self._init_plot_figure(ax, figsize)
 
         hist_color = color if color is not None else self._primary_color
@@ -354,10 +532,9 @@ class Data:
         
         series_data = [self._get_plot_series(col) for col in cols_to_plot]
         data_to_plot = [s[0] for s in series_data]
-        labels_with_units = [s[1] for s in series_data]
+        labels_with_units = [s[2] for s in series_data]
         
         fig, ax = self._init_plot_figure(ax, figsize)
-
         bp = ax.boxplot(data_to_plot, patch_artist=True, zorder=3, **kwargs)
 
         for patch in bp['boxes']:
@@ -385,10 +562,9 @@ class Data:
         
         series_data = [self._get_plot_series(col) for col in cols_to_plot]
         data_to_plot = [s[0] for s in series_data]
-        labels_with_units = [s[1] for s in series_data]
+        labels_with_units = [s[2] for s in series_data]
         
         fig, ax = self._init_plot_figure(ax, figsize)
-
         vp = ax.violinplot(data_to_plot, showmedians=True, showextrema=True, **kwargs)
 
         for pc in vp['bodies']:
@@ -412,17 +588,16 @@ class Data:
         return fig, ax
 
     def residual_plot(self, x: str, y: str, ax=None, figsize=(8, 4.5), title="Residual Plot", grid=True, **kwargs):
-        x_vals, x_label = self._get_plot_series(x)
-        y_vals, y_label = self._get_plot_series(y)
+        x_vals, _, x_label = self._get_plot_series(x)
+        y_vals, _, y_label = self._get_plot_series(y)
         
         m, b = np.polyfit(x_vals, y_vals, 1)
         y_pred = m * x_vals + b
         residuals = y_vals - y_pred
 
         fig, ax = self._init_plot_figure(ax, figsize)
-
         ax.axhline(0, color=self._secondary_color, linestyle='--', linewidth=1.5, zorder=2)
-        ax.scatter(x_vals, residuals, color=self._primary_color, edgecolor='white', linewidths=0.8, s=45, zorder=3, **kwargs)
+        ax.scatter(x_vals, residuals, color=self._primary_color, s=45, zorder=3, **kwargs)
 
         self._format_labels(ax, x_label, f"Residuals ({y_label})", title)
         if grid: self._apply_grid(ax)
@@ -444,24 +619,24 @@ class Data:
                 ax.set_facecolor(self._facecolor)
 
                 if i == j:
-                    vals, _ = self._get_plot_series(cols[i])
+                    vals, _, _ = self._get_plot_series(cols[i])
                     ax.hist(vals, color=self._primary_color, alpha=0.85, edgecolor='white')
                 else:
-                    x_vals, _ = self._get_plot_series(cols[j])
-                    y_vals, _ = self._get_plot_series(cols[i])
+                    x_vals, _, _ = self._get_plot_series(cols[j])
+                    y_vals, _, _ = self._get_plot_series(cols[i])
                     ax.scatter(x_vals, y_vals, color=self._primary_color, s=20, alpha=0.7, edgecolors='none')
 
                 for spine in ax.spines.values():
                     spine.set_color('#d0d0d0')
 
                 if i == n - 1:
-                    _, x_lbl = self._get_plot_series(cols[j])
+                    _, _, x_lbl = self._get_plot_series(cols[j])
                     ax.set_xlabel(x_lbl, fontsize=9, fontweight='bold')
                 else:
                     ax.set_xticklabels([])
 
                 if j == 0:
-                    _, y_lbl = self._get_plot_series(cols[i])
+                    _, _, y_lbl = self._get_plot_series(cols[i])
                     ax.set_ylabel(y_lbl, fontsize=9, fontweight='bold')
                 else:
                     ax.set_yticklabels([])
@@ -480,7 +655,6 @@ class Data:
             )
 
         cax = ax.imshow(corr_df.values, cmap=cmap, vmin=-1, vmax=1, aspect='auto', **kwargs)
-        
         cbar = fig.colorbar(cax, ax=ax, fraction=0.046, pad=0.04)
         cbar.ax.tick_params(labelsize=9, colors='#555555')
         cbar.outline.set_edgecolor('#d0d0d0')
@@ -508,6 +682,24 @@ class Data:
         fig.tight_layout()
         return fig, ax
 
+    def generate_report(self, output_path, format_type="html", **kwargs):
+        """Generate a scientific report in HTML or PDF format.
+
+        Parameters
+        ----------
+        output_path : str
+            Destination file path.
+        format_type : {"html", "pdf"}, default="html"
+            Report output format. PDF export uses ReportLab directly.
+        **kwargs
+            Additional options forwarded to the report generator (for example
+            ``title``, ``author`` or ``logo_path``).
+        """
+        from .report import generate_report
+        return generate_report(
+            self, output_path=output_path, format_type=format_type, **kwargs
+        )
+
 
 class DataStatsResult:
     def __init__(self, stats_dict: dict):
@@ -520,7 +712,10 @@ class DataStatsResult:
         data_formatted = {}
         for k, v in self.stats.items():
             if isinstance(v, Quantity):
-                data_formatted[k] = f"{v.value} {v.unit.symbol}"
+                if np.any(v.error != 0):
+                    data_formatted[k] = f"({v.value} ± {v.error}) {v.unit.symbol}"
+                else:
+                    data_formatted[k] = f"{v.value} {v.unit.symbol}"
             else:
                 data_formatted[k] = v
         df = pd.DataFrame([data_formatted], index=["valor"])

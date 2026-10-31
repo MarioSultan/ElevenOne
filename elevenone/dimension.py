@@ -8,7 +8,8 @@ class Dimension:
             "Corriente",
             "Temperatura",
             "Cantidad de sustancia",
-            "Intensidad luminosa"
+            "Intensidad luminosa",
+            "Angulo"
         ]
 
         # Asegurar que la lista de dimensiones tenga la longitud correcta (7 magnitudes fundamentales)
@@ -64,6 +65,7 @@ CURRENT             = Dimension([0, 0, 0, 1])
 TEMPERATURE         = Dimension([0, 0, 0, 0, 1])
 AMOUNT              = Dimension([0, 0, 0, 0, 0, 1])
 LUMINOUS            = Dimension([0, 0, 0, 0, 0, 0, 1])
+ANGULAR             = Dimension([0, 0, 0, 0, 0, 0, 0, 1])
 
 # ==============================================================================
 # DIMENSIONES DERIVADAS (MECÁNICA Y CINEMÁTICA)
