@@ -1,0 +1,136 @@
+# ==========================================================================
+# ElevenOne — Scientific Python Library
+# Spectral Laboratory documentation
+# ==========================================================================
+
+site_name: ElevenOne
+site_description: A scientific Python library for physical quantities, units, data and visualization
+site_author: Mario Sultan Romero
+site_url: https://elevenone.readthedocs.io/
+
+repo_name: MarioSultan/ElevenOne
+repo_url: https://github.com/MarioSultan/ElevenOne
+edit_uri: edit/main/docs/
+
+
+# ---------- Theme ----------
+
+theme:
+  name: material
+  language: en
+
+  # Brand assets
+  # Place your logo at docs/assets/logo.png
+  logo: assets/logo.png
+  favicon: assets/logo.png
+
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+  font:
+    text: Inter
+    code: JetBrains Mono
+
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.path
+    - navigation.footer
+
+    - search.suggest
+    - search.highlight
+
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+
+  icon:
+    repo: fontawesome/brands/github
+
+
+# ---------- Navigation ----------
+
+nav:
+  - Home: index.md
+
+  - Getting started:
+      - Introduction: introduction.md
+      - Installation: installation.md
+      - Quick start: quickstart.md
+
+  - Physical quantities:
+      - Quantities and magnitudes: quantities.md
+      - Dimensions: dimensions.md
+      - Physical constants: constants.md
+
+  - Units:
+      - Units: units.md
+      - Unit systems: unit_systems.md
+      - Unit conversion: unit_conversion.md
+      - Custom units: custom_units.md
+
+  - Data:
+      - Data structures: data.md
+      - Measurements: measurements.md
+      - Operations: data_operations.md
+
+  - Visualization:
+      - Plotting: plotting.md
+      - Customization: customization.md
+
+
+# ---------- Custom styling ----------
+
+extra_css:
+  - stylesheets/extra.css
+
+
+# ---------- Markdown extensions ----------
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.superfences
+
+  - pymdownx.tabbed:
+      alternate_style: true
+
+  - pymdownx.arithmatex:
+      generic: true
+
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+  - tables
+
+
+# ---------- JavaScript ----------
+
+extra_javascript:
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+
+# ---------- Footer ----------
+
+copyright: "© 2026 Mario Sultan · ElevenOne" 
