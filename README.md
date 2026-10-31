@@ -1,5 +1,10 @@
 # **ElevenOne**: *your perfect lab assistant*
 
+[![PyPI Downloads](https://img.shields.io/pypi/dm/elevenone)](https://pypistats.org/packages/elevenone)
+[![PyPI Version](https://img.shields.io/pypi/v/elevenone?color=00ccff)](https://pypi.org/project/elevenone/)
+[![Python Versions](https://img.shields.io/pypi/pyversions/elevenone?color=00ccff)](https://pypi.org/project/elevenone/)
+![Last Commit](https://img.shields.io/github/last-commit/MarioSultan/elevenone?color=ff2ad4)
+
 ![ElevenOne Logo](https://raw.githubusercontent.com/MarioSultan/ElevenOne/main/banner.png)
 
 ![Examples](https://raw.githubusercontent.com/MarioSultan/ElevenOne/main/imgs/examples.png)
