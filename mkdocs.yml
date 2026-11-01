@@ -81,9 +81,9 @@ nav:
       - Physical constants: physical_constants.md
 
   - Data:
-      - Data structures: data.md
+      - Data structures: data_structures.md
       - Load data: load_data.md
-      - Operations: data_operations.md
+      - Operations: operations.md
 
   - Plotting:
       - Basic plotting: basic_plotting.md
