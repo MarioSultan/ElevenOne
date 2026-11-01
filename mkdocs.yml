@@ -97,6 +97,9 @@ nav:
       - Multivariate pairwise grid: pairplot.md
       - Correlation matrix heatmap: corr_heatmap.md
 
+  - Automated scientific reports:
+      - Report generator: report.md
+
 
 # ---------- Custom styling ----------
 
