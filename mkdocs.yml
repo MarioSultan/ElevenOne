@@ -78,7 +78,7 @@ nav:
   - Physical quantities and units:
       - Basic usage: basic_usage.md
       - Quantities, units and uncertainties: quantities_units_and_uncertainties.md
-      - Physical constants: physical_constants.md
+      # - Physical constants: physical_constants.md
 
   - Data:
       - Data structures: data_structures.md
@@ -86,8 +86,16 @@ nav:
       - Operations: operations.md
 
   - Plotting:
-      - Basic plotting: basic_plotting.md
-      - Customization: customization.md
+      - Line plot: plot.md
+      - Scatter plot & linear fitting: scatter.md
+      - Explicit errorbar plot: errorbar.md
+      - Bar charts: bar.md
+      - Histogram: hist.md
+      - Boxplot: boxplot.md
+      - Violin density plot: violin.md
+      - Regression residual plot: residual_plot.md
+      - Multivariate pairwise grid: pairplot.md
+      - Correlation matrix heatmap: corr_heatmap.md
 
 
 # ---------- Custom styling ----------
