@@ -8,7 +8,7 @@ site_description: A scientific Python library for physical quantities, units, da
 site_author: Mario Sultan Romero
 site_url: https://elevenone.readthedocs.io/
 
-repo_name: MarioSultan/ElevenOne
+repo_name: ElevenOne
 repo_url: https://github.com/MarioSultan/ElevenOne
 edit_uri: edit/main/docs/
 
