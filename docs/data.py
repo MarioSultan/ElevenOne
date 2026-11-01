@@ -1,0 +1,824 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
+from .unit import Quantity, Unit
+from .dimension import DIMENSIONLESS
+from .styles import DEFAULT_STYLES
+
+class Data:
+    _styles = DEFAULT_STYLES.copy()
+    _current_style = "elevenone"
+
+    _primary_color = DEFAULT_STYLES["elevenone"]["primary"]
+    _secondary_color = DEFAULT_STYLES["elevenone"]["secondary"]
+    _facecolor = DEFAULT_STYLES["elevenone"]["facecolor"]
+    _figure_facecolor = DEFAULT_STYLES["elevenone"]["figure_facecolor"]
+    _grid_color = DEFAULT_STYLES["elevenone"]["grid_color"]
+    _text_color = DEFAULT_STYLES["elevenone"]["text_color"]
+    _error_color = DEFAULT_STYLES["elevenone"]["error_color"]
+
+    @classmethod
+    def register_style(cls, name: str, primary: str = "#00ccff", secondary: str = "#ff2ad4", 
+                       facecolor: str = "#fcfcfc", figure_facecolor: str = "#ffffff", 
+                       grid_color: str = "#ebebeb", text_color: str = "#1a1a1a", error_color: str = "#888888"):
+        """Registra o actualiza un estilo personalizado en el catálogo de estilos."""
+        cls._styles[name] = {
+            "primary": primary,
+            "secondary": secondary,
+            "facecolor": facecolor,
+            "figure_facecolor": figure_facecolor,
+            "grid_color": grid_color,
+            "text_color": text_color,
+            "error_color": error_color
+        }
+
+    @classmethod
+    def list_styles(cls):
+        """Devuelve la lista de nombres de estilos disponibles."""
+        return list(cls._styles.keys())
+
+    @classmethod
+    def set_style(cls, style_name: str = None, **kwargs):
+        """Establece el estilo visual cargando uno guardado o especificando colores directamente.
+        
+        Parámetros
+        ----------
+        style_name : str, opcional
+            Nombre del estilo predefinido o registrado a cargar (ej. 'elevenone', 'dark_mode').
+        **kwargs :
+            Permite sobrescribir atributos individuales del estilo (primary, secondary, facecolor, 
+            figure_facecolor, grid_color, text_color, error_color).
+        """
+        if style_name is not None:
+            if style_name not in cls._styles:
+                raise ValueError(f"Estilo '{style_name}' no encontrado. Estilos disponibles: {cls.list_styles()}")
+            style_dict = cls._styles[style_name].copy()
+            cls._current_style = style_name
+        else:
+            style_dict = cls._styles[cls._current_style].copy()
+
+        style_dict.update({k: v for k, v in kwargs.items() if k in style_dict})
+
+        cls._primary_color = style_dict["primary"]
+        cls._secondary_color = style_dict["secondary"]
+        cls._facecolor = style_dict["facecolor"]
+        cls._figure_facecolor = style_dict["figure_facecolor"]
+        cls._grid_color = style_dict["grid_color"]
+        cls._text_color = style_dict["text_color"]
+        cls._error_color = style_dict["error_color"]
+
+        cls._apply_global_rc_params()
+
+    @classmethod
+    def set_theme(cls, *args, **kwargs):
+        """Alias retrocompatible para set_style."""
+        if args and isinstance(args[0], str) and args[0] in cls._styles:
+            cls.set_style(args[0], **kwargs)
+        else:
+            if args:
+                keys = ["primary", "secondary", "facecolor", "figure_facecolor", "grid_color", "text_color", "error_color"]
+                for k, v in zip(keys, args):
+                    kwargs[k] = v
+            cls.set_style(style_name=None, **kwargs)
+
+    @classmethod
+    def _apply_global_rc_params(cls):
+        plt.rcParams.update({
+            'font.family': 'sans-serif',
+            'font.sans-serif': ['Helvetica', 'Arial', 'DejaVu Sans', 'Liberation Sans'],
+            'text.color': cls._text_color,
+            'axes.labelcolor': cls._text_color,
+            'xtick.color': '#666666',
+            'ytick.color': '#666666',
+            'xtick.direction': 'in',
+            'ytick.direction': 'in',
+            'axes.linewidth': 0.8,
+            'grid.linestyle': '--',
+            'grid.alpha': 0.4,
+            'figure.autolayout': True
+        })
+
+    def __init__(self, data_dict: dict):
+        self.dict = {}
+        self._length = None
+        self._apply_global_rc_params()
+
+        for col_name, val in data_dict.items():
+            if isinstance(val, Quantity):
+                col_data = val
+            elif isinstance(val, (list, np.ndarray, tuple)):
+                col_data = np.asarray(val)
+            else:
+                col_data = np.asarray([val])
+
+            length = len(col_data)
+            if self._length is None:
+                self._length = length
+            elif length != self._length:
+                raise ValueError(f"Column '{col_name}' has length {length}, but expected {self._length}.")
+
+            self.dict[col_name] = col_data
+
+        self.columns = list(self.dict.keys())
+
+    def __getitem__(self, key):
+        if isinstance(key, str):
+            if key not in self.dict:
+                raise KeyError(f"Column '{key}' not found in Data.")
+            return self.dict[key]
+
+        if isinstance(key, (list, tuple)) and len(key) > 0 and all(isinstance(col, str) for col in key):
+            sub_dict = {}
+            for col in key:
+                if col not in self.dict:
+                    raise KeyError(f"Column '{col}' not found in Data.")
+                sub_dict[col] = self.dict[col]
+            return Data(sub_dict)
+
+        is_bool_array = isinstance(key, np.ndarray) and key.dtype == bool
+        is_bool_list = isinstance(key, (list, tuple)) and len(key) == self._length and all(isinstance(x, (bool, np.bool_)) for x in key)
+
+        if is_bool_array or is_bool_list:
+            mask = np.asarray(key)
+            if len(mask) != self._length:
+                raise ValueError(f"Boolean mask length ({len(mask)}) does not match data length ({self._length}).")
+            
+            filtered_dict = {}
+            for col, val in self.dict.items():
+                if isinstance(val, Quantity):
+                    filtered_dict[col] = Quantity(val.value[mask], val.unit, val.error[mask])
+                elif isinstance(val, np.ndarray):
+                    filtered_dict[col] = val[mask]
+                else:
+                    filtered_dict[col] = np.asarray(val)[mask]
+            
+            return Data(filtered_dict)
+
+        is_int = isinstance(key, (int, np.integer))
+        is_slice = isinstance(key, slice)
+        is_int_array = isinstance(key, np.ndarray) and np.issubdtype(key.dtype, np.integer)
+        is_int_list = isinstance(key, (list, tuple)) and (len(key) == 0 or all(isinstance(x, (int, np.integer)) for x in key))
+
+        if is_int:
+            indices = [key]
+        elif is_slice:
+            indices = list(range(self._length)[key])
+        elif is_int_array or is_int_list:
+            indices = list(key)
+        else:
+            indices = None
+
+        if indices is not None:
+            filtered_dict = {}
+            for col, val in self.dict.items():
+                if isinstance(val, Quantity):
+                    filtered_dict[col] = Quantity(val.value[indices], val.unit, val.error[indices])
+                elif isinstance(val, np.ndarray):
+                    filtered_dict[col] = val[indices]
+                else:
+                    filtered_dict[col] = np.asarray(val)[indices]
+            return Data(filtered_dict)
+
+        raise TypeError("Invalid key type for indexing Data.")
+
+    def query(self, expr: str):
+        local_dict = {}
+        for col_name, val in self.dict.items():
+            if isinstance(val, Quantity):
+                local_dict[col_name] = val.value
+            else:
+                local_dict[col_name] = val
+
+        try:
+            mask = eval(expr, {"np": np}, local_dict)
+        except Exception as e:
+            raise ValueError(f"Error evaluating query expression '{expr}': {e}")
+
+        return self[mask]
+
+    def head(self, n: int = 5):
+        n = min(max(0, n), self._length)
+        return self[np.arange(n)]
+
+    def tail(self, n: int = 5):
+        n = min(max(0, n), self._length)
+        start = max(0, self._length - n)
+        return self[np.arange(start, self._length)]
+
+    def sample(self, n: int = None, frac: float = None, replace: bool = False, random_state: int = None):
+        if random_state is not None:
+            np.random.seed(random_state)
+        
+        if n is None and frac is None:
+            n = 1
+        elif frac is not None:
+            if not (0.0 <= frac <= 1.0):
+                raise ValueError("frac must be between 0.0 and 1.0")
+            n = int(round(self._length * frac))
+        
+        if not replace and n > self._length:
+            raise ValueError("Cannot sample larger than population when replace=False")
+            
+        indices = np.random.choice(self._length, size=n, replace=replace)
+        return self[indices]
+
+    def sort_values(self, by, ascending=True):
+        if isinstance(by, str):
+            by = [by]
+        
+        for col in by:
+            if col not in self.dict:
+                raise KeyError(f"Column '{col}' not found in Data.")
+        
+        primary_col = by[0]
+        val = self.dict[primary_col]
+        arr = val.value if isinstance(val, Quantity) else val
+        
+        sorted_indices = np.argsort(arr)
+        if not ascending:
+            sorted_indices = sorted_indices[::-1]
+            
+        return self[sorted_indices]
+
+    def drop_duplicates(self, subset=None, keep='first'):
+        if subset is None:
+            cols = self.columns
+        elif isinstance(subset, str):
+            cols = [subset]
+        else:
+            cols = list(subset)
+            
+        for col in cols:
+            if col not in self.dict:
+                raise KeyError(f"Column '{col}' not found in Data.")
+                
+        columns_data = [
+            (self.dict[c].value if isinstance(self.dict[c], Quantity) else self.dict[c])
+            for c in cols
+        ]
+        
+        seen = set()
+        keep_indices = []
+        
+        if keep == 'first':
+            for i in range(self._length):
+                row_key = tuple(col_data[i] for col_data in columns_data)
+                if row_key not in seen:
+                    seen.add(row_key)
+                    keep_indices.append(i)
+        elif keep == 'last':
+            last_seen = {}
+            for i in range(self._length):
+                row_key = tuple(col_data[i] for col_data in columns_data)
+                last_seen[row_key] = i
+            keep_indices = sorted(list(last_seen.values()))
+        elif keep is False:
+            from collections import Counter
+            row_keys = [tuple(col_data[i] for col_data in columns_data) for i in range(self._length)]
+            counts = Counter(row_keys)
+            keep_indices = [i for i, rk in enumerate(row_keys) if counts[rk] == 1]
+        else:
+            raise ValueError("keep must be 'first', 'last', or False")
+            
+        return self[np.array(keep_indices)]
+
+    def rename(self, columns: dict):
+        new_dict = {}
+        for k, v in self.dict.items():
+            new_key = columns.get(k, k)
+            new_dict[new_key] = v
+        return Data(new_dict)
+
+    def set_error(self, columns, errors):
+        if isinstance(columns, str):
+            columns = [columns]
+
+        if isinstance(errors, dict):
+            for col, err in errors.items():
+                if col not in self.dict:
+                    raise KeyError(f"Columna '{col}' no encontrada en Data.")
+                val = self.dict[col]
+                if isinstance(val, Quantity):
+                    val.set_error(err)
+                else:
+                    self.dict[col] = Quantity(val, Unit(DIMENSIONLESS), err)
+        else:
+            for col in columns:
+                if col not in self.dict:
+                    raise KeyError(f"Columna '{col}' no encontrada en Data.")
+                val = self.dict[col]
+                if isinstance(val, Quantity):
+                    val.set_error(errors)
+                else:
+                    self.dict[col] = Quantity(val, Unit(DIMENSIONLESS), errors)
+        return self
+
+    def __setitem__(self, key, value):
+        if self._length is not None:
+            if isinstance(value, Quantity):
+                val = np.atleast_1d(value.value)
+                err = np.atleast_1d(value.error)
+                if len(val) == 1 and self._length > 1:
+                    val_arr = np.full(self._length, val[0])
+                    err_arr = np.full(self._length, err[0])
+                    col_data = Quantity(val_arr, value.unit, err_arr)
+                else:
+                    col_data = value
+            else:
+                arr = np.asarray(value)
+                if arr.ndim == 0 or (arr.ndim == 1 and len(arr) == 1 and self._length > 1):
+                    scalar_val = arr.item() if arr.ndim == 0 else arr[0]
+                    col_data = np.full(self._length, scalar_val)
+                else:
+                    col_data = arr
+        else:
+            if isinstance(value, Quantity):
+                col_data = value
+            elif isinstance(value, (list, np.ndarray, tuple)):
+                col_data = np.asarray(value)
+            else:
+                col_data = np.asarray([value])
+
+        if self._length is not None and len(col_data) != self._length:
+            raise ValueError(f"La longitud de los nuevos datos ({len(col_data)}) no coincide con la del Data ({self._length}).")
+
+        if self._length is None:
+            self._length = len(col_data)
+
+        self.dict[key] = col_data
+        self.columns = list(self.dict.keys())
+
+    def __delitem__(self, key):
+        if key in self.dict:
+            del self.dict[key]
+            self.columns = list(self.dict.keys())
+            if not self.dict:
+                self._length = None
+        else:
+            raise KeyError(f"Column '{key}' not found in Data.")
+
+    def copy(self):
+        new_dict = {}
+        for k, v in self.dict.items():
+            if isinstance(v, Quantity):
+                val_copy = v.value.copy() if hasattr(v.value, 'copy') else v.value
+                err_copy = v.error.copy() if hasattr(v.error, 'copy') else v.error
+                new_dict[k] = Quantity(val_copy, v.unit, err_copy)
+            elif isinstance(v, np.ndarray):
+                new_dict[k] = v.copy()
+            else:
+                new_dict[k] = np.copy(v) if hasattr(v, '__array__') else v
+        return Data(new_dict)
+
+    @property
+    def shape(self):
+        return (self._length, len(self.dict))
+
+    def __len__(self):
+        return self._length
+
+    def _to_dataframe(self):
+        representation_dict = {}
+        for col_name, col_data in self.dict.items():
+            if isinstance(col_data, Quantity):
+                representation_dict[f"{col_name} [{col_data.unit.symbol}]"] = col_data.value
+                representation_dict[f"{col_name}_err"] = col_data.error
+            else:
+                representation_dict[col_name] = col_data
+        return pd.DataFrame(representation_dict)
+
+    def __repr__(self):
+        return str(self._to_dataframe())
+
+    def _repr_html_(self):
+        return self._to_dataframe()._repr_html_()
+
+    def _numeric_columns(self):
+        return {k: v for k, v in self.dict.items() if isinstance(v, Quantity) or np.issubdtype(v.dtype, np.number)}
+
+    def describe(self):
+        stats_rows = ['count', 'mean', 'std', 'min', 'Q1', 'Q2', 'Q3', 'max']
+        numeric_cols = self._numeric_columns()
+        summary_data = {}
+
+        for k, v in numeric_cols.items():
+            is_qty = isinstance(v, Quantity)
+            unit_sym = v.unit.symbol if is_qty else ""
+            vals = v.value if is_qty else np.asarray(v)
+
+            count = len(vals)
+            mean_val = np.mean(vals)
+            std_val = np.std(vals, ddof=1) if len(vals) > 1 else 0.0
+            min_val = np.min(vals)
+            p25_val = np.percentile(vals, 25)
+            med_val = np.median(vals)
+            p75_val = np.percentile(vals, 75)
+            max_val = np.max(vals)
+
+            col_stats = []
+            for val in [count, mean_val, std_val, min_val, p25_val, med_val, p75_val, max_val]:
+                if is_qty:
+                    if val is count:
+                        col_stats.append(val)
+                    else:
+                        col_stats.append(f"{val:.4g} {unit_sym}")
+                else:
+                    col_stats.append(val if val is count else f"{val:.4g}" if isinstance(val, (int, float, np.number)) else val)
+            
+            summary_data[k] = col_stats
+
+        df_summary = pd.DataFrame(summary_data, index=stats_rows)
+        return DataDescribeResult(df_summary)
+
+    def mean(self):
+        res = {k: (v.mean() if isinstance(v, Quantity) else np.mean(v)) for k, v in self._numeric_columns().items()}
+        return DataStatsResult(res)
+
+    def median(self):
+        res = {k: (Quantity(np.median(v.value), v.unit, np.median(v.error)) if isinstance(v, Quantity) else np.median(v)) for k, v in self._numeric_columns().items()}
+        return DataStatsResult(res)
+
+    def min(self):
+        res = {k: (v.min() if isinstance(v, Quantity) else np.min(v)) for k, v in self._numeric_columns().items()}
+        return DataStatsResult(res)
+
+    def max(self):
+        res = {k: (v.max() if isinstance(v, Quantity) else np.max(v)) for k, v in self._numeric_columns().items()}
+        return DataStatsResult(res)
+
+    def std(self, ddof=1):
+        res = {k: (v.std(ddof=ddof) if isinstance(v, Quantity) else np.std(v, ddof=ddof)) for k, v in self._numeric_columns().items()}
+        return DataStatsResult(res)
+
+    def var(self, ddof=1):
+        res = {k: (v.var(ddof=ddof) if isinstance(v, Quantity) else np.var(v, ddof=ddof)) for k, v in self._numeric_columns().items()}
+        return DataStatsResult(res)
+
+    def corr(self):
+        num_cols = self._numeric_columns()
+        data_for_corr = {k: (v.value if isinstance(v, Quantity) else v) for k, v in num_cols.items()}
+        return pd.DataFrame(data_for_corr).corr()
+
+    def _get_plot_series(self, col_name: str):
+        if col_name not in self.dict:
+            raise KeyError(f"Column '{col_name}' not found in Data.")
+        
+        col_data = self.dict[col_name]
+        if isinstance(col_data, Quantity):
+            values = col_data.value
+            errors = col_data.error
+            label = f"{col_name} [{col_data.unit.symbol}]"
+        else:
+            values = col_data
+            errors = np.zeros_like(values, dtype=float)
+            label = col_name
+        return values, errors, label
+
+    def _init_plot_figure(self, ax, figsize):
+        if ax is None:
+            fig, ax = plt.subplots(figsize=figsize, dpi=200)
+        else:
+            fig = ax.get_figure()
+        
+        fig.patch.set_facecolor(self._figure_facecolor)
+        ax.set_facecolor(self._facecolor)
+        
+        for spine_name in ['top', 'right']:
+            ax.spines[spine_name].set_visible(False)
+        for spine_name in ['left', 'bottom']:
+            ax.spines[spine_name].set_color('#d0d0d0')
+            ax.spines[spine_name].set_linewidth(1.0)
+
+        ax.tick_params(colors='#555555', which='both', labelsize=10, length=4, width=0.8)
+        return fig, ax
+
+    def _apply_grid(self, ax, axis='both'):
+        ax.grid(True, linestyle='--', alpha=0.45, color=self._grid_color, axis=axis, zorder=0)
+
+    def _format_labels(self, ax, xlabel, ylabel, title):
+        ax.set_xlabel(xlabel, fontsize=11, fontweight='bold', color=self._text_color, labelpad=10)
+        ax.set_ylabel(ylabel, fontsize=11, fontweight='bold', color=self._text_color, labelpad=10)
+        if title:
+            ax.set_title(title, fontsize=13, fontweight='bold', color=self._text_color, pad=15, loc='left')
+
+    def plot(self, x: str, y: str, ax=None, figsize=(8, 4.5), color=None, linestyle='-', linewidth=2.2, 
+             marker='o', markersize=True, fill_area=True, sort_x=True, title=None, xlabel=None, ylabel=None, grid=True, **kwargs):
+        x_vals, x_errs, x_label = self._get_plot_series(x)
+        y_vals, y_errs, y_label = self._get_plot_series(y)
+        
+        if sort_x:
+            sort_idx = np.argsort(x_vals)
+            x_vals = x_vals[sort_idx]
+            x_errs = x_errs[sort_idx]
+            y_vals = y_vals[sort_idx]
+            y_errs = y_errs[sort_idx]
+
+        fig, ax = self._init_plot_figure(ax, figsize)
+        line_color = color if color is not None else self._primary_color
+        
+        if fill_area:
+            ax.fill_between(x_vals, y_vals, color=line_color, alpha=0.08, zorder=1)
+
+        if markersize:
+            markersize = 0 if len(x_vals) > 25 else 4.5
+
+        if (np.any(y_errs != 0) or np.any(x_errs != 0)) and len(x_vals) <= 25:
+            ax.errorbar(x_vals, y_vals, yerr=y_errs if np.any(y_errs!=0) else None, 
+                        xerr=x_errs if np.any(x_errs!=0) else None, fmt='none', ecolor=self._error_color, 
+                        elinewidth=1.2, capsize=3, zorder=2)
+
+        ax.plot(x_vals, y_vals, color=line_color, linestyle=linestyle, linewidth=linewidth, 
+                marker=marker, markersize=markersize, zorder=3, markeredgecolor='white', markeredgewidth=0.8, **kwargs)
+
+        self._format_labels(ax, xlabel or x_label, ylabel or y_label, title)
+        if grid: 
+            self._apply_grid(ax)
+
+        fig.tight_layout()
+        return fig, ax
+
+    def scatter(self, x: str, y: str, ax=None, figsize=(8, 4.5), color=None, s=45, alpha=1, 
+                marker='o', fit=False, title=None, xlabel=None, ylabel=None, grid=True, **kwargs):
+        x_vals, x_errs, x_label = self._get_plot_series(x)
+        y_vals, y_errs, y_label = self._get_plot_series(y)
+        fig, ax = self._init_plot_figure(ax, figsize)
+
+        scatter_color = color if color is not None else self._primary_color
+        
+        if s == 45 and len(x_vals) > 25:
+            s = 15
+
+        if (np.any(y_errs != 0) or np.any(x_errs != 0)) and len(x_vals) <= 25:
+            ax.errorbar(x_vals, y_vals, yerr=y_errs if np.any(y_errs!=0) else None, 
+                        xerr=x_errs if np.any(x_errs!=0) else None, fmt='none', ecolor=self._error_color, 
+                        elinewidth=1.2, capsize=3, zorder=2)
+
+        ax.scatter(x_vals, y_vals, color=scatter_color, s=s, alpha=alpha, marker=marker, zorder=3, **kwargs)
+
+        if fit and len(x_vals) > 1:
+            m, b = np.polyfit(x_vals, y_vals, 1)
+            y_fit = m * x_vals + b
+            ax.plot(x_vals, y_fit, color=self._secondary_color, linestyle='-', linewidth=1.8, 
+                    zorder=4, label=f'Fit: $y = {m:.3g}x + {b:.3g}$')
+            ax.legend(frameon=True, facecolor=self._figure_facecolor, edgecolor='none', fontsize=9)
+
+        self._format_labels(ax, xlabel or x_label, ylabel or y_label, title)
+        if grid: self._apply_grid(ax)
+
+        fig.tight_layout()
+        return fig, ax
+
+    def errorbar(self, x: str, y: str, yerr: str = None, xerr: str = None, ax=None, figsize=(8, 4.5), 
+                 color=None, ecolor=None, capsize=4, title=None, xlabel=None, ylabel=None, grid=True, **kwargs):
+        x_vals, internal_xerr, x_label = self._get_plot_series(x)
+        y_vals, internal_yerr, y_label = self._get_plot_series(y)
+        
+        yerr_vals = self._get_plot_series(yerr)[0] if yerr else (internal_yerr if np.any(internal_yerr!=0) else None)
+        xerr_vals = self._get_plot_series(xerr)[0] if xerr else (internal_xerr if np.any(internal_xerr!=0) else None)
+
+        fig, ax = self._init_plot_figure(ax, figsize)
+        main_color = color if color is not None else self._primary_color
+        err_color = ecolor if ecolor is not None else self._secondary_color
+
+        actual_capsize = capsize if len(x_vals) <= 25 else 0
+        actual_elinewidth = 1.5 if len(x_vals) <= 25 else 0.8
+
+        ax.errorbar(x_vals, y_vals, yerr=yerr_vals, xerr=xerr_vals, fmt='o', color=main_color, 
+                    ecolor=err_color, elinewidth=actual_elinewidth, capsize=actual_capsize, capthick=actual_elinewidth, zorder=3, **kwargs)
+
+        self._format_labels(ax, xlabel or x_label, ylabel or y_label, title)
+        if grid: self._apply_grid(ax)
+
+        fig.tight_layout()
+        return fig, ax
+
+    def bar(self, x: str, y: str, ax=None, figsize=(8, 4.5), color=None, width=0.6, 
+            title=None, xlabel=None, ylabel=None, grid=True, **kwargs):
+        x_vals, _, x_label = self._get_plot_series(x)
+        y_vals, y_errs, y_label = self._get_plot_series(y)
+        fig, ax = self._init_plot_figure(ax, figsize)
+
+        bar_color = color if color is not None else self._primary_color
+        
+        if np.any(y_errs != 0) and len(x_vals) <= 25:
+            ax.bar(x_vals, y_vals, yerr=y_errs, capsize=3, ecolor=self._secondary_color, color=bar_color, width=width, edgecolor='none', zorder=3, **kwargs)
+        else:
+            ax.bar(x_vals, y_vals, color=bar_color, width=width, edgecolor='none', zorder=3, **kwargs)
+
+        self._format_labels(ax, xlabel or x_label, ylabel or y_label, title)
+        if grid: self._apply_grid(ax, axis='y')
+
+        fig.tight_layout()
+        return fig, ax
+
+    def hist(self, column: str, bins=12, ax=None, figsize=(8, 4.5), color=None, 
+             title=None, xlabel=None, ylabel=None, grid=True, **kwargs):
+        vals, _, label = self._get_plot_series(column)
+        fig, ax = self._init_plot_figure(ax, figsize)
+
+        hist_color = color if color is not None else self._primary_color
+        ax.hist(vals, bins=bins, color=hist_color, alpha=0.85, edgecolor='white', linewidth=1.0, zorder=3, **kwargs)
+
+        self._format_labels(ax, xlabel or label, ylabel or "Frequency", title)
+        if grid: self._apply_grid(ax, axis='y')
+
+        fig.tight_layout()
+        return fig, ax
+
+    def boxplot(self, columns: list = None, ax=None, figsize=(8, 4.5), title=None, ylabel=None, grid=True, **kwargs):
+        num_cols = self._numeric_columns()
+        cols_to_plot = columns or list(num_cols.keys())
+        
+        series_data = [self._get_plot_series(col) for col in cols_to_plot]
+        data_to_plot = [s[0] for s in series_data]
+        labels_with_units = [s[2] for s in series_data]
+        
+        fig, ax = self._init_plot_figure(ax, figsize)
+        bp = ax.boxplot(data_to_plot, patch_artist=True, zorder=3, **kwargs)
+
+        for patch in bp['boxes']:
+            patch.set_facecolor(self._primary_color)
+            patch.set_alpha(0.7)
+            patch.set_edgecolor(self._primary_color)
+            patch.set_linewidth(1.2)
+
+        for element in ['whiskers', 'caps']:
+            plt.setp(bp[element], color='#666666', linewidth=1.2)
+
+        plt.setp(bp['medians'], color=self._secondary_color, linewidth=2.0)
+        plt.setp(bp['fliers'], marker='o', color=self._secondary_color, alpha=0.6, markersize=4)
+
+        ax.set_xticklabels(labels_with_units, fontsize=10, fontweight='bold')
+        self._format_labels(ax, "", ylabel or "Value", title)
+        if grid: self._apply_grid(ax, axis='y')
+
+        fig.tight_layout()
+        return fig, ax
+
+    def violin(self, columns: list = None, ax=None, figsize=(8, 4.5), title=None, ylabel=None, grid=True, **kwargs):
+        num_cols = self._numeric_columns()
+        cols_to_plot = columns or list(num_cols.keys())
+        
+        series_data = [self._get_plot_series(col) for col in cols_to_plot]
+        data_to_plot = [s[0] for s in series_data]
+        labels_with_units = [s[2] for s in series_data]
+        
+        fig, ax = self._init_plot_figure(ax, figsize)
+        vp = ax.violinplot(data_to_plot, showmedians=True, showextrema=True, **kwargs)
+
+        for pc in vp['bodies']:
+            pc.set_facecolor(self._primary_color)
+            pc.set_alpha(0.6)
+            pc.set_edgecolor(self._primary_color)
+
+        for partname in ('cbars', 'cmins', 'cmaxes'):
+            vp[partname].set_edgecolor('#666666')
+            vp[partname].set_linewidth(1.0)
+
+        vp['cmedians'].set_edgecolor(self._secondary_color)
+        vp['cmedians'].set_linewidth(2.0)
+
+        ax.set_xticks(np.arange(1, len(cols_to_plot) + 1))
+        ax.set_xticklabels(labels_with_units, fontsize=10, fontweight='bold')
+        self._format_labels(ax, "", ylabel or "Value", title)
+        if grid: self._apply_grid(ax, axis='y')
+
+        fig.tight_layout()
+        return fig, ax
+
+    def residual_plot(self, x: str, y: str, ax=None, figsize=(8, 4.5), title="Residual Plot", grid=True, **kwargs):
+        x_vals, _, x_label = self._get_plot_series(x)
+        y_vals, _, y_label = self._get_plot_series(y)
+        
+        m, b = np.polyfit(x_vals, y_vals, 1)
+        y_pred = m * x_vals + b
+        residuals = y_vals - y_pred
+
+        fig, ax = self._init_plot_figure(ax, figsize)
+        ax.axhline(0, color=self._secondary_color, linestyle='--', linewidth=1.5, zorder=2)
+        
+        scatter_s = 45 if len(x_vals) <= 25 else 15
+        ax.scatter(x_vals, residuals, color=self._primary_color, s=scatter_s, zorder=3, **kwargs)
+
+        self._format_labels(ax, x_label, f"Residuals ({y_label})", title)
+        if grid: self._apply_grid(ax)
+
+        fig.tight_layout()
+        return fig, ax
+
+    def pairplot(self, columns: list = None, figsize=(9, 9)):
+        num_cols = self._numeric_columns()
+        cols = columns or list(num_cols.keys())
+        n = len(cols)
+
+        fig, axes = plt.subplots(n, n, figsize=figsize, dpi=180)
+        fig.patch.set_facecolor(self._figure_facecolor)
+
+        for i in range(n):
+            for j in range(n):
+                ax = axes[i, j] if n > 1 else axes
+                ax.set_facecolor(self._facecolor)
+
+                if i == j:
+                    vals, _, _ = self._get_plot_series(cols[i])
+                    ax.hist(vals, color=self._primary_color, alpha=0.85, edgecolor='white')
+                else:
+                    x_vals, _, _ = self._get_plot_series(cols[j])
+                    y_vals, _, _ = self._get_plot_series(cols[i])
+                    point_s = 20 if len(x_vals) <= 25 else 8
+                    ax.scatter(x_vals, y_vals, color=self._primary_color, s=point_s, alpha=0.7, edgecolors='none')
+
+                for spine in ax.spines.values():
+                    spine.set_color('#d0d0d0')
+
+                if i == n - 1:
+                    _, _, x_lbl = self._get_plot_series(cols[j])
+                    ax.set_xlabel(x_lbl, fontsize=9, fontweight='bold')
+                else:
+                    ax.set_xticklabels([])
+
+                if j == 0:
+                    _, _, y_lbl = self._get_plot_series(cols[i])
+                    ax.set_ylabel(y_lbl, fontsize=9, fontweight='bold')
+                else:
+                    ax.set_yticklabels([])
+
+        fig.tight_layout()
+        return fig, axes
+
+    def corr_heatmap(self, ax=None, figsize=(7, 6), title="Correlation Matrix", cmap=None, annot=True, fmt=".2f", **kwargs):
+        corr_df = self.corr()
+        fig, ax = self._init_plot_figure(ax, figsize)
+
+        if cmap is None:
+            cmap = LinearSegmentedColormap.from_list(
+                "brand_corr", 
+                [self._secondary_color, "#ffffff", self._primary_color]
+            )
+
+        cax = ax.imshow(corr_df.values, cmap=cmap, vmin=-1, vmax=1, aspect='auto', **kwargs)
+        cbar = fig.colorbar(cax, ax=ax, fraction=0.046, pad=0.04)
+        cbar.ax.tick_params(labelsize=9, colors='#555555')
+        cbar.outline.set_edgecolor('#d0d0d0')
+
+        columns = list(corr_df.columns)
+        ax.set_xticks(np.arange(len(columns)))
+        ax.set_yticks(np.arange(len(columns)))
+        ax.set_xticklabels(columns, rotation=45, ha='right', fontsize=10, fontweight='bold')
+        ax.set_yticklabels(columns, fontsize=10, fontweight='bold')
+
+        if annot:
+            for i in range(len(columns)):
+                for j in range(len(columns)):
+                    val = corr_df.values[i, j]
+                    text_color = "#ffffff" if abs(val) > 0.55 else self._text_color
+                    ax.text(j, i, f"{val:{fmt}}", ha="center", va="center", color=text_color, fontsize=9, fontweight='bold')
+
+        ax.grid(False)
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+
+        if title:
+            ax.set_title(title, fontsize=13, fontweight='bold', color=self._text_color, pad=15, loc='left')
+
+        fig.tight_layout()
+        return fig, ax
+
+    def generate_report(self, output_path, format_type="html", **kwargs):
+        from .report import generate_report
+        return generate_report(
+            self, output_path=output_path, format_type=format_type, **kwargs
+        )
+
+
+class DataStatsResult:
+    def __init__(self, stats_dict: dict):
+        self.stats = stats_dict
+
+    def __repr__(self):
+        return "\n".join([f"  {k}: {v}" for k, v in self.stats.items()])
+
+    def _repr_html_(self):
+        data_formatted = {}
+        for k, v in self.stats.items():
+            if isinstance(v, Quantity):
+                if np.any(v.error != 0):
+                    data_formatted[k] = f"({v.value} ± {v.error}) {v.unit.symbol}"
+                else:
+                    data_formatted[k] = f"{v.value} {v.unit.symbol}"
+            else:
+                data_formatted[k] = v
+        df = pd.DataFrame([data_formatted], index=["valor"])
+        return df.T.rename(columns={0: "Estadística"})._repr_html_()
+
+
+class DataDescribeResult:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df
+
+    def __repr__(self):
+        return str(self.df)
+
+    def _repr_html_(self):
+        return self.df._repr_html_()
