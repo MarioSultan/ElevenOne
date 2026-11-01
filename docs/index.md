@@ -45,10 +45,32 @@ data, and the tools provided by the library.
 
 ## Documentation
 
+### Getting started
+
+- [Introduction](introduction_to_elevenone.md)
+- [Installation](installation.md)
+- [Quick start](quick_start_guide.md)
+
+### Physical quantities and units
+
+- [Basic usage](basic_usage.md)
+- [Quantities, units and uncertainties](quantities_units_and_uncertainties.md)
+- [Physical constants](physical_constants.md)
+
+### Data
+
+- [Data structures](data.md)
+- [Load data](load_data.md)
+- [Operations](data_operations.md)
+
+### Plotting
+
+- [Basic plotting](basic_plotting.md)
+- [Customization](customization.md)
 
 ------------------------------------------------------------------------
 
-## Project
+### Project
 
 ElevenOne is an open-source scientific computing project developed in
 Python.
