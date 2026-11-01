@@ -70,6 +70,10 @@ Discover everything you can do with ElevenOne here:
     - [Multivariate pairwise grid](pairplot.md)
     - [Correlation matrix heatmap](corr_heatmap.md)
 
+???+ "Automated scientific reports"
+
+    - [Report generator](report.md)
+
 
 ------------------------------------------------------------------------
 
