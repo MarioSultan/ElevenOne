@@ -71,28 +71,22 @@ nav:
   - Home: index.md
 
   - Getting started:
-      - Introduction: introduction.md
+      - Introduction: introduction_to_elevenone.md
       - Installation: installation.md
-      - Quick start: quickstart.md
+      - Quick start: quick_start_guide.md
 
-  - Physical quantities:
-      - Quantities and magnitudes: quantities.md
-      - Dimensions: dimensions.md
-      - Physical constants: constants.md
-
-  - Units:
-      - Units: units.md
-      - Unit systems: unit_systems.md
-      - Unit conversion: unit_conversion.md
-      - Custom units: custom_units.md
+  - Physical quantities and units:
+      - Basic usage: basic_usage
+      - Quantities, units and uncertainties: quantities_units_and_uncertainties.md
+      - Physical constants: physical_constants.md
 
   - Data:
       - Data structures: data.md
-      - Measurements: measurements.md
+      - Load data: load_data.md
       - Operations: data_operations.md
 
-  - Visualization:
-      - Plotting: plotting.md
+  - Plotting:
+      - Basic plotting: basic_plotting.md
       - Customization: customization.md
 
 
