@@ -10,34 +10,48 @@
 
 :root > * {
   --md-primary-fg-color: #00CCFF;
-  --md-primary-fg-color--light: #66DFFF;
-  --md-primary-fg-color--dark: #00A3CC;
+  --md-primary-fg-color--light: #66E0FF;
+  --md-primary-fg-color--dark: #009FC9;
 
+  --md-primary-bg-color: #000000;
   --md-accent-fg-color: #FF2AD4;
-  --md-accent-fg-color--transparent: rgba(255, 42, 212, 0.10);
+  --md-accent-fg-color--transparent: rgba(255, 42, 212, 0.12);
 
   --eo-cyan: #00CCFF;
   --eo-pink: #FF2AD4;
 
-  --eo-cyan-soft: color-mix(in srgb, #00CCFF 12%, white);
-  --eo-cyan-pale: color-mix(in srgb, #00CCFF 5%, white);
-  --eo-pink-soft: color-mix(in srgb, #FF2AD4 10%, white);
+  --eo-cyan-soft: rgba(0, 204, 255, 0.10);
+  --eo-cyan-pale: rgba(0, 204, 255, 0.055);
+  --eo-cyan-border: rgba(0, 204, 255, 0.28);
 
-  --eo-white: #FFFFFF;
-  --eo-border: rgba(0, 204, 255, 0.28);
-  --eo-pink-border: rgba(255, 42, 212, 0.30);
+  --eo-pink-soft: rgba(255, 42, 212, 0.10);
+  --eo-pink-border: rgba(255, 42, 212, 0.25);
+
+  --eo-paper: #E8FAFF;
+  --eo-surface: #FFFFFF;
+  --eo-ink: #000000;
+  --eo-muted: rgba(0, 0, 0, 0.60);
+  --eo-border: rgba(0, 204, 255, 0.24);
 }
 
 [data-md-color-scheme="slate"] {
   --md-primary-fg-color: #00CCFF;
-  --md-primary-fg-color--light: #66DFFF;
-  --md-primary-fg-color--dark: #00A3CC;
+  --md-primary-fg-color--light: #66E0FF;
+  --md-primary-fg-color--dark: #009FC9;
 
+  --md-primary-bg-color: #000000;
   --md-accent-fg-color: #FF2AD4;
-  --md-accent-fg-color--transparent: rgba(255, 42, 212, 0.12);
+  --md-accent-fg-color--transparent: rgba(255, 42, 212, 0.13);
 
-  --eo-cyan-soft: color-mix(in srgb, #00CCFF 12%, #FFFFFF);
-  --eo-cyan-pale: color-mix(in srgb, #00CCFF 5%, #FFFFFF);
+  --eo-paper: #000000;
+  --eo-surface: #080808;
+  --eo-ink: #FFFFFF;
+  --eo-muted: rgba(255, 255, 255, 0.65);
+
+  --eo-border: rgba(0, 204, 255, 0.25);
+  --eo-cyan-soft: rgba(0, 204, 255, 0.09);
+  --eo-cyan-pale: rgba(0, 204, 255, 0.045);
+  --eo-pink-soft: rgba(255, 42, 212, 0.10);
 }
 
 
@@ -45,6 +59,7 @@
 
 .md-typeset {
   line-height: 1.75;
+  color: var(--eo-ink);
 }
 
 .md-typeset h1,
@@ -52,7 +67,7 @@
 .md-typeset h3,
 .md-typeset h4 {
   font-weight: 650;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.025em;
 }
 
 .md-typeset h1 {
@@ -68,11 +83,13 @@
   left: 0;
   width: 90px;
   height: 3px;
+  border-radius: 2px;
 
   background: linear-gradient(
     90deg,
-    var(--eo-cyan),
-    var(--eo-pink)
+    #00CCFF 0%,
+    #00CCFF 70%,
+    #FF2AD4 100%
   );
 }
 
@@ -96,26 +113,28 @@
   background: linear-gradient(
     110deg,
     #00CCFF 0%,
-    #00CCFF 55%,
-    rgba(255, 42, 212, 0.85) 100%
+    #00CCFF 65%,
+    rgba(255, 42, 212, 0.75) 100%
   );
 
-  box-shadow: 0 3px 15px rgba(0, 204, 255, 0.20);
+  box-shadow: 0 3px 16px rgba(0, 204, 255, 0.20);
 }
 
-/* Subtle white spectral reflection */
+/* Subtle spectral highlight */
 
-.md-header::before {
+.md-header::after {
   content: "";
   position: absolute;
-  inset: 0;
-  pointer-events: none;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 2px;
 
   background: linear-gradient(
-    115deg,
-    rgba(255, 255, 255, 0.22),
-    transparent 48%,
-    rgba(255, 255, 255, 0.10)
+    90deg,
+    #FF2AD4,
+    #FFFFFF 35%,
+    #FF2AD4
   );
 }
 
@@ -127,56 +146,60 @@
 .md-header__title {
   font-weight: 750;
   letter-spacing: 0.025em;
+  color: #000000;
 }
 
-/* Small pink signature */
+.md-header__button {
+  color: #000000;
+}
 
-.md-header::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 3px;
-  background: var(--eo-pink);
+/* Hide the site-name topic in the header.
+   Keep the current page title visible when available. */
+
+.md-header__topic:first-child {
+  display: none;
 }
 
 
 /* ---------- 4. Top navigation ---------- */
 
 .md-tabs {
-  position: relative;
-  background: linear-gradient(
-    90deg,
-    #00CCFF,
-    color-mix(in srgb, #00CCFF 82%, white)
-  );
+  background: #00CCFF;
+  border-bottom: 2px solid rgba(255, 42, 212, 0.65);
 }
 
 .md-tabs__link {
-  color: #FFFFFF;
-  opacity: 0.82;
-  transition: opacity 180ms ease;
+  color: #000000;
+  opacity: 0.72;
+
+  transition:
+    opacity 160ms ease,
+    background 160ms ease;
 }
 
 .md-tabs__link:hover,
 .md-tabs__link--active {
+  color: #000000;
   opacity: 1;
 }
 
 .md-tabs__item--active {
-  border-bottom: 3px solid var(--eo-pink);
+  border-bottom: 3px solid #FF2AD4;
 }
 
 
 /* ---------- 5. Sidebar ---------- */
 
+.md-sidebar {
+  background: var(--eo-cyan-pale);
+}
+
 .md-nav__title {
   font-weight: 700;
+  letter-spacing: 0.015em;
 }
 
 .md-nav__link {
-  position: relative;
   border-radius: 5px;
   margin: 3px 0;
 
@@ -188,52 +211,57 @@
 
 .md-nav__link:hover {
   background: var(--eo-cyan-soft);
-  padding-left: 0.8em;
+  padding-left: 0.85em;
 }
 
 .md-nav__link--active {
   font-weight: 700;
+  color: #000000;
   background: var(--eo-cyan-soft);
-  box-shadow: inset 3px 0 0 var(--eo-cyan);
+  box-shadow: inset 3px 0 0 #00CCFF;
 }
 
-/* Pink detail on the active item */
-
-.md-nav__link--active::after {
-  content: "";
-  position: absolute;
-  right: 7px;
-  top: 50%;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--eo-pink);
-  transform: translateY(-50%);
+[data-md-color-scheme="slate"] .md-nav__link--active {
+  color: #00CCFF;
 }
 
 
-/* ---------- 6. Main background and content ---------- */
+/* ---------- 6. Main background and content surface ---------- */
 
 .md-main {
-  background:
+  background-color: var(--eo-paper);
+
+  background-image:
+    radial-gradient(
+      ellipse at 0% 0%,
+      rgba(0, 204, 255, 0.14),
+      transparent 45%
+    ),
+    radial-gradient(
+      ellipse at 100% 100%,
+      rgba(0, 204, 255, 0.09),
+      transparent 42%
+    ),
     linear-gradient(
       135deg,
-      color-mix(in srgb, #00CCFF 15%, white),
-      color-mix(in srgb, #00CCFF 4%, white) 48%,
-      color-mix(in srgb, #FF2AD4 5%, white)
+      rgba(0, 204, 255, 0.025),
+      transparent 55%
     );
 }
 
+/* White reading surface in light mode.
+   Almost black reading surface in dark mode. */
+
 .md-content__inner {
-  background: #FFFFFF;
+  background: var(--eo-surface);
   border: 1px solid var(--eo-border);
-  border-top: 3px solid var(--eo-cyan);
-  border-radius: 9px;
+  border-top: 3px solid #00CCFF;
+  border-radius: 8px;
 
   padding: 1.8rem 2.2rem;
 
   box-shadow:
-    0 4px 20px rgba(0, 204, 255, 0.07);
+    0 4px 24px rgba(0, 204, 255, 0.065);
 }
 
 .md-grid {
@@ -244,27 +272,32 @@
 /* ---------- 7. Links ---------- */
 
 .md-typeset a {
+  color: #009FC9;
   font-weight: 550;
   text-decoration: none;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.2em;
+
+  transition: color 150ms ease;
 }
 
 .md-typeset a:hover {
-  color: var(--eo-pink);
+  color: #FF2AD4;
   text-decoration: underline;
+  text-underline-offset: 0.2em;
 }
 
-.md-typeset a:focus-visible {
-  outline-color: var(--eo-pink);
+[data-md-color-scheme="slate"] .md-typeset a {
+  color: #00CCFF;
 }
 
 
-/* ---------- 8. Code: clean computational identity ---------- */
+/* ---------- 8. Code: computational identity ---------- */
 
 .highlight {
   border-radius: 8px;
-  box-shadow: 0 4px 15px rgba(0, 204, 255, 0.09);
+  overflow: hidden;
+
+  box-shadow:
+    0 4px 18px rgba(0, 204, 255, 0.09);
 }
 
 .md-typeset pre > code {
@@ -274,14 +307,19 @@
 
 .md-typeset code {
   border-radius: 4px;
+  color: #0086AD;
 }
 
 .md-clipboard {
-  color: #00CCFF;
+  color: #009FC9;
 }
 
 .md-clipboard:hover {
-  color: var(--eo-pink);
+  color: #FF2AD4;
+}
+
+[data-md-color-scheme="slate"] .md-typeset code {
+  color: #00CCFF;
 }
 
 
@@ -289,17 +327,17 @@
 
 .md-typeset table:not([class]) {
   border: 1px solid var(--eo-border);
-  border-radius: 8px;
+  border-radius: 7px;
   overflow: hidden;
 
-  box-shadow: 0 3px 12px rgba(0, 204, 255, 0.06);
+  box-shadow: 0 3px 14px rgba(0, 204, 255, 0.055);
 }
 
 .md-typeset table:not([class]) th {
   background: #00CCFF;
-  color: #FFFFFF;
+  color: #000000;
   font-weight: 700;
-  border-bottom: 3px solid var(--eo-pink);
+  border-bottom: 2px solid #FF2AD4;
 }
 
 .md-typeset table:not([class]) tr:hover {
@@ -326,15 +364,15 @@
 }
 
 .md-typeset .admonition.note {
-  border-left-color: var(--eo-cyan);
+  border-left-color: #00CCFF;
 }
 
 .md-typeset .admonition.tip {
-  border-left-color: var(--eo-pink);
+  border-left-color: #FF2AD4;
 }
 
 .md-typeset .admonition.warning {
-  border-left-color: var(--eo-pink);
+  border-left-color: #FF2AD4;
 }
 
 
@@ -342,62 +380,94 @@
 
 .md-search__form {
   border-radius: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(0, 204, 255, 0.35);
+
+  transition: border-color 160ms ease;
 }
 
 .md-search__form:focus-within {
-  border-color: var(--eo-pink);
+  border-color: #FF2AD4;
 }
 
 
-/* ---------- 12. Footer ---------- */
+/* ---------- 12. Footer: author identity ---------- */
 
 .md-footer {
+  position: relative;
   background: #00CCFF;
-  border-top: 3px solid var(--eo-pink);
+  color: #000000;
+}
+
+.md-footer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+
+  background: linear-gradient(
+    90deg,
+    #FF2AD4,
+    #FFFFFF 50%,
+    #FF2AD4
+  );
 }
 
 .md-footer-meta {
-  background: color-mix(in srgb, #00CCFF 85%, white);
+  background: #000000;
+  color: #FFFFFF;
+  border-top: 1px solid rgba(0, 204, 255, 0.35);
+}
+
+.md-footer-meta a {
+  color: #00CCFF;
+}
+
+.md-footer-meta a:hover {
+  color: #FF2AD4;
 }
 
 
 /* ---------- 13. Buttons ---------- */
 
 .md-button {
-  border-radius: 6px;
-  font-weight: 650;
+  border-radius: 5px;
+  font-weight: 700;
 
   transition:
     transform 150ms ease,
-    box-shadow 150ms ease,
-    background 150ms ease;
+    box-shadow 150ms ease;
 }
 
 .md-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(0, 204, 255, 0.20);
+
+  box-shadow:
+    0 5px 18px rgba(0, 204, 255, 0.25);
 }
 
 .md-button--primary {
   background: #00CCFF;
   border-color: #00CCFF;
+  color: #000000;
 }
 
 .md-button--primary:hover {
-  background: color-mix(in srgb, #00CCFF 85%, white);
-  border-color: var(--eo-pink);
+  background: #00B8E8;
+  border-color: #00B8E8;
 }
 
 
 /* ---------- 14. Focus and selection ---------- */
 
 ::selection {
-  background: rgba(0, 204, 255, 0.25);
+  background: rgba(0, 204, 255, 0.28);
+  color: inherit;
 }
 
 :focus-visible {
-  outline: 2px solid var(--eo-pink);
+  outline: 2px solid #FF2AD4;
   outline-offset: 3px;
 }
 
@@ -406,7 +476,7 @@
 
 @media screen and (max-width: 76.1875em) {
   .md-content__inner {
-    padding: 1.2rem;
+    padding: 1.3rem;
   }
 
   .md-typeset h1 {
@@ -416,7 +486,16 @@
 
 @media screen and (max-width: 44.9375em) {
   .md-content__inner {
-    padding: 0.7rem;
-    border-radius: 6px;
+    padding: 0.6rem;
+    border-radius: 5px;
+  }
+
+  .md-main {
+    background-image:
+      radial-gradient(
+        ellipse at 0% 0%,
+        rgba(0, 204, 255, 0.10),
+        transparent 55%
+      );
   }
 }
