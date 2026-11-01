@@ -1,47 +1,60 @@
 # **ElevenOne**: *your perfect lab assistant*
 
-[![PyPI Downloads](https://img.shields.io/pypi/dm/elevenone)](https://pypistats.org/packages/elevenone)
-[![PyPI Version](https://img.shields.io/pypi/v/elevenone?color=00ccff)](https://pypi.org/project/elevenone/)
-[![Python Versions](https://img.shields.io/pypi/pyversions/elevenone?color=00ccff)](https://pypi.org/project/elevenone/)
-![Last Commit](https://img.shields.io/github/last-commit/MarioSultan/elevenone?color=ff2ad4)
+[![PyPI
+Downloads](https://img.shields.io/pypi/dm/elevenone)](https://pypistats.org/packages/elevenone)
+[![PyPI
+Version](https://img.shields.io/pypi/v/elevenone?color=00ccff)](https://pypi.org/project/elevenone/)
+[![Python
+Versions](https://img.shields.io/pypi/pyversions/elevenone?color=00ccff)](https://pypi.org/project/elevenone/)
+![Last
+Commit](https://img.shields.io/github/last-commit/MarioSultan/elevenone?color=ff2ad4)
 
-![ElevenOne Logo](https://raw.githubusercontent.com/MarioSultan/ElevenOne/main/banner.png)
+![ElevenOne
+Logo](https://raw.githubusercontent.com/MarioSultan/ElevenOne/main/banner.png)
 
 ![Examples](https://raw.githubusercontent.com/MarioSultan/ElevenOne/main/imgs/examples.png)
 
-ElevenOne is a Python library for seamless scientific unit management, rigorous laboratory data processing, and automated publication-ready plotting.
+ElevenOne is a Python library for seamless scientific unit management,
+rigorous laboratory data processing, and automated publication-ready
+plotting.
 
 Some of the things ElevenOne can do include:
-- Handling of physical units
-- Automatic data loading with unit detection
-- High-level scientific plotting and visualizations
-- Automated publication-grade scientific reports ★
 
----
+-   Handling of physical units
+-   Automatic data loading with unit detection
+-   High-level scientific plotting and visualizations
+-   Automated publication-grade scientific reports ★
+
+------------------------------------------------------------------------
 
 ## Handling of physical units
 
-ElevenOne features a complete internal system for handling physical units. Among the things it can do are the use and management of physical units, operations with them, and conversion between them.
+ElevenOne features a complete internal system for handling physical
+units. Among the things it can do are the use and management of physical
+units, operations with them, and conversion between them.
 
-```python
+``` python
 from elevenone import *
 
 speed = 90 * km/h
 print(speed.convert_to(m/s))
 ```
-```text
+
+``` text
 >>> 25 m/s
 ```
 
 ElevenOne has more than 60 different units to use in your project!
 
----
+------------------------------------------------------------------------
 
 ## Automatic Data Loading with Unit Detection
 
-ElevenOne can load data directly from CSV or Excel files (`.csv`, `.xls`, `.xlsx`), automatically detecting physical units in column headers (e.g., `Time (s)`, `Pressure [kPa]`) or within data cells.
+ElevenOne can load data directly from CSV or Excel files (`.csv`,
+`.xls`, `.xlsx`), automatically detecting physical units in column
+headers (e.g., `Time (s)`, `Pressure [kPa]`) or within data cells.
 
-```python
+``` python
 from elevenone import load_data
 
 # Load data automatically parsing units into Quantity objects
@@ -52,13 +65,14 @@ print(df["Time"])
 print(df["Speed"].mean())
 ```
 
----
+------------------------------------------------------------------------
 
 ## High-Level Scientific Plotting
 
-With `Data` objects, you can generate modern, publication-ready plots with built-in unit handling and automatic labeling:
+With `Data` objects, you can generate modern, publication-ready plots
+with built-in unit handling and automatic labeling:
 
-```python
+``` python
 from elevenone import Data, s, m
 
 # Create dataset with units
@@ -75,22 +89,26 @@ fig, ax = data.scatter(x="Time", y="Distance", fit=True, title="Linear Fit Analy
 ```
 
 ElevenOne supports multiple visualization modes out of the box:
-- `data.plot()`: Line plots with area fills.
-- `data.scatter()`: Scatter plots with optional linear fit (`fit=True`).
-- `data.errorbar()`: Uncertainty visualization (`xerr`, `yerr`).
-- `data.hist()`: Distribution histograms.
-- `data.boxplot()` & `data.violin()`: Outlier and density distribution plots.
-- `data.residual_plot()`: Residual error analysis for fits.
-- `data.pairplot()`: Pairwise correlation grid.
-- `data.corr_heatmap()`: Pearson correlation heatmaps.
 
----
+-   `data.plot()`: Line plots with area fills.
+-   `data.scatter()`: Scatter plots with optional linear fit
+    (`fit=True`).
+-   `data.errorbar()`: Uncertainty visualization (`xerr`, `yerr`).
+-   `data.hist()`: Distribution histograms.
+-   `data.boxplot()` & `data.violin()`: Outlier and density distribution
+    plots.
+-   `data.residual_plot()`: Residual error analysis for fits.
+-   `data.pairplot()`: Pairwise correlation grid.
+-   `data.corr_heatmap()`: Pearson correlation heatmaps.
+
+------------------------------------------------------------------------
 
 ## Automated Scientific Reports
 
-Generate full statistical and visual analytical reports with a single function call in **HTML** or **PDF** format.
+Generate full statistical and visual analytical reports with a single
+function call in **HTML** or **PDF** format.
 
-```python
+``` python
 from elevenone import load_data, generate_report
 
 # Load laboratory dataset
@@ -103,4 +121,27 @@ generate_report(data, output_path="report.html", title="Laboratory Experiment An
 generate_report(data, output_path="report.pdf", format_type="pdf")
 ```
 
-The report automatically compiles dataset overview metrics, descriptive statistics, advanced indicators (skewness, kurtosis, IQR), correlation matrices, and distribution graphs without exposing raw data lines.
+The report automatically compiles dataset overview metrics, descriptive
+statistics, advanced indicators (skewness, kurtosis, IQR), correlation
+matrices, and distribution graphs without exposing raw data lines.
+
+------------------------------------------------------------------------
+
+## Documentation
+
+The complete documentation, including installation instructions,
+getting-started guides, usage examples, and feature references, is
+available at:
+
+**[ElevenOne Documentation](https://elevenone.readthedocs.io/)**
+
+------------------------------------------------------------------------
+
+## License
+
+ElevenOne is open-source software released under the **MIT License**.
+You are free to use, modify, and distribute it, including for commercial
+purposes, provided that the copyright and permission notices are
+retained.
+
+See the [LICENSE](LICENSE) file for the complete license text.
