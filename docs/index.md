@@ -69,10 +69,15 @@ Discover everything you can do with ElevenOne here:
     - [Regression residual plot](residual_plot.md)
     - [Multivariate pairwise grid](pairplot.md)
     - [Correlation matrix heatmap](corr_heatmap.md)
+    - [Plots customization](customization.md)
 
 ???+ "Automated scientific reports"
 
     - [Report generator](report.md)
+
+???+ "Data fitting"
+
+    - [Linear fit](linear_fit.md)
 
 
 ------------------------------------------------------------------------
