@@ -40,47 +40,35 @@ data, and the tools provided by the library.
 
 Discover everything you can do with ElevenOne here:
 
-<details>
-<summary>Getting started</summary>
+???+ "Getting started"
 
-- [Introduction](introduction_to_elevenone.md)
-- [Installation](installation.md)
-- [Quick start](quick_start_guide.md)
+    - [Introduction](introduction_to_elevenone.md)
+    - [Installation](installation.md)
+    - [Quick start](quick_start_guide.md)
 
-</details>
+???+ "Physical quantities and units"
 
-<details>
-<summary>Physical quantities and units</summary>
+    - [Basic usage](basic_usage.md)
+    - [Quantities, units and uncertainties](quantities_units_and_uncertainties.md)
 
-- [Basic usage](basic_usage.md)
-- [Quantities, units and uncertainties](quantities_units_and_uncertainties.md)
+???+ "Data"
 
-</details>
+    - [Data structures](data_structures.md)
+    - [Load data](load_data.md)
+    - [Operations](operations.md)
 
-<details>
-<summary>Data</summary>
+???+ "Plotting"
 
-- [Data structures](data_structures.md)
-- [Load data](load_data.md)
-- [Operations](operations.md)
-
-</details>
-
-<details>
-<summary>Plotting</summary>
-
-- [Line plot](plot.md)
-- [Scatter plot & linear fitting](scatter.md)
-- [Explicit errorbar plot](errorbar.md)
-- [Bar charts](bar.md)
-- [Histogram](hist.md)
-- [Boxplot](boxplot.md)
-- [Violin density plot](violin.md)
-- [Regression residual plot](residual_plot.md)
-- [Multivariate pairwise grid](pairplot.md)
-- [Correlation matrix heatmap](corr_heatmap.md)
-
-</details>
+    - [Line plot](plot.md)
+    - [Scatter plot & linear fitting](scatter.md)
+    - [Explicit errorbar plot](errorbar.md)
+    - [Bar charts](bar.md)
+    - [Histogram](hist.md)
+    - [Boxplot](boxplot.md)
+    - [Violin density plot](violin.md)
+    - [Regression residual plot](residual_plot.md)
+    - [Multivariate pairwise grid](pairplot.md)
+    - [Correlation matrix heatmap](corr_heatmap.md)
 
 
 ------------------------------------------------------------------------
