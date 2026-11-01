@@ -17,20 +17,13 @@ experimentation, numerical analysis, or physical applications.
 
 ------------------------------------------------------------------------
 
-## Installation
+## Getting started
 
 To install ElevenOne from PyPI, write in the terminal:
 
 ``` bash
 pip install elevenone
 ```
-
-------------------------------------------------------------------------
-
-## Getting started
-
-ElevenOne is designed to make scientific calculations straightforward
-while keeping track of the physical meaning of the quantities involved.
 
 Once installed, import the library using:
 
@@ -45,28 +38,50 @@ data, and the tools provided by the library.
 
 ## Documentation
 
-### Getting started
+Discover everything you can do with ElevenOne here:
+
+<details>
+<summary>Getting started</summary>
 
 - [Introduction](introduction_to_elevenone.md)
 - [Installation](installation.md)
 - [Quick start](quick_start_guide.md)
 
-### Physical quantities and units
+</details>
+
+<details>
+<summary>Physical quantities and units</summary>
 
 - [Basic usage](basic_usage.md)
 - [Quantities, units and uncertainties](quantities_units_and_uncertainties.md)
-- [Physical constants](physical_constants.md)
 
-### Data
+</details>
 
-- [Data structures](data.md)
+<details>
+<summary>Data</summary>
+
+- [Data structures](data_structures.md)
 - [Load data](load_data.md)
-- [Operations](data_operations.md)
+- [Operations](operations.md)
 
-### Plotting
+</details>
 
-- [Basic plotting](basic_plotting.md)
-- [Customization](customization.md)
+<details>
+<summary>Plotting</summary>
+
+- [Line plot](plot.md)
+- [Scatter plot & linear fitting](scatter.md)
+- [Explicit errorbar plot](errorbar.md)
+- [Bar charts](bar.md)
+- [Histogram](hist.md)
+- [Boxplot](boxplot.md)
+- [Violin density plot](violin.md)
+- [Regression residual plot](residual_plot.md)
+- [Multivariate pairwise grid](pairplot.md)
+- [Correlation matrix heatmap](corr_heatmap.md)
+
+</details>
+
 
 ------------------------------------------------------------------------
 
