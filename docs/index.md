@@ -40,25 +40,25 @@ data, and the tools provided by the library.
 
 Discover everything you can do with ElevenOne here:
 
-???+ "Getting started"
+??? "Getting started"
 
     - [Introduction](introduction_to_elevenone.md)
     - [Installation](installation.md)
     - [Quick start](quick_start_guide.md)
 
-???+ "Physical quantities and units"
+??? "Physical quantities and units"
 
     - [Basic usage](basic_usage.md)
     - [Quantities, units and uncertainties](quantities_units_and_uncertainties.md)
     - [Unit systems](unit_systems.md)
 
-???+ "Data"
+??? "Data"
 
     - [Data structures](data_structures.md)
     - [Load data](load_data.md)
     - [Operations](operations.md)
 
-???+ "Plotting"
+??? "Plotting"
 
     - [Line plot](plot.md)
     - [Scatter plot & linear fitting](scatter.md)
@@ -72,11 +72,11 @@ Discover everything you can do with ElevenOne here:
     - [Correlation matrix heatmap](corr_heatmap.md)
     - [Plots customization](customization.md)
 
-???+ "Automated scientific reports"
+??? "Automated scientific reports"
 
     - [Report generator](report.md)
 
-???+ "Data fitting"
+??? "Data fitting"
 
     - [Data fit and fit results](fitting.md)
     - [Linear fit](fit_linear.md)
