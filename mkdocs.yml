@@ -78,7 +78,7 @@ nav:
   - Physical quantities and units:
       - Basic usage: basic_usage.md
       - Quantities, units and uncertainties: quantities_units_and_uncertainties.md
-      # - Unit packages: unit_packages.md
+      - Unit systems: unit_systems.md
       # - Physical constants: physical_constants.md
 
   - Data:
