@@ -103,7 +103,7 @@ nav:
       - Report generator: report.md
 
   - Data fitting:
-      - Data fit and fir results: fitting.md
+      - Data fit and fit results: fitting.md
       - Linear fit: fit_linear.md
       - Polynomial fit: fit_polynomial.md
       - Exponential fit: fit_exponential.md
