@@ -4,13 +4,42 @@ import numpy as np
 _basic_symbols = ["m", "kg", "s", "A", "K", "mol", "cd", "rad"]
 
 
+def _format_dimension_symbol(dim_list):
+    superscripts = str.maketrans("0123456789+-", "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻")
+    pos_parts = []
+    neg_parts = []
+    for sym, exp in zip(_basic_symbols, dim_list):
+        if exp == 0:
+            continue
+        if exp == 1:
+            part = sym
+        elif exp == -1:
+            part = f"{sym}⁻¹"
+        else:
+            exp_str = str(exp).translate(superscripts)
+            part = f"{sym}{exp_str}"
+        
+        if exp > 0:
+            pos_parts.append(part)
+        else:
+            neg_parts.append(part)
+            
+    all_parts = pos_parts + neg_parts
+    if not all_parts:
+        return "1"
+    return "·".join(all_parts)
+
+
 class Unit:
     __array_priority__ = 1000
 
-    def __init__(self, dimension: Dimension, symbol: str, factor: float = 1.0,
+    def __init__(self, dimension: Dimension, symbol: str = None, factor: float = 1.0,
                  offset: float = 0.0, linear: bool = True):
         self.dimension = dimension
-        self.symbol = symbol
+        if symbol is None:
+            self.symbol = _format_dimension_symbol(dimension.dimension)
+        else:
+            self.symbol = symbol
         self.factor = factor
         self.offset = offset
         self.linear = linear
@@ -23,8 +52,9 @@ class Unit:
 
     def __mul__(self, other):
         if isinstance(other, Unit):
-            return Unit(self.dimension * other.dimension,
-                        f"{self.symbol}·{other.symbol}",
+            new_dim = self.dimension * other.dimension
+            return Unit(new_dim,
+                        _format_dimension_symbol(new_dim.dimension),
                         self.factor * other.factor)
         if isinstance(other, (int, float, np.number, np.ndarray, list, tuple)):
             return Quantity(other, self)
@@ -35,25 +65,30 @@ class Unit:
 
     def __truediv__(self, other):
         if isinstance(other, Unit):
-            return Unit(self.dimension / other.dimension,
-                        f"{self.symbol}/{other.symbol}",
+            new_dim = self.dimension / other.dimension
+            return Unit(new_dim,
+                        _format_dimension_symbol(new_dim.dimension),
                         self.factor / other.factor)
 
     def __rtruediv__(self, other):
         if isinstance(other, (int, float, np.number, np.ndarray, list, tuple)) and np.all(np.asarray(other) == 1):
-            return Unit(DIMENSIONLESS / self.dimension,
-                        f"1/{self.symbol}", 1 / self.factor)
+            new_dim = DIMENSIONLESS / self.dimension
+            return Unit(new_dim,
+                        _format_dimension_symbol(new_dim.dimension), 1 / self.factor)
 
     def __pow__(self, n):
         new_dim = self.dimension ** n
-        superscripts = str.maketrans("0123456789+-", "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻")
-        n_str = str(n).translate(superscripts)
-        symbol = f"({self.symbol}){n_str}" if "/" in self.symbol or "·" in self.symbol else f"{self.symbol}{n_str}"
-        return Unit(new_dim, symbol, self.factor ** n)
+        return Unit(new_dim,
+                    _format_dimension_symbol(new_dim.dimension), self.factor ** n)
+
+
+# Standard predefined units for mathematical operations
+RADIAN = Unit(ANGULAR, "rad", 1.0)
+DIMENSIONLESS_UNIT = Unit(DIMENSIONLESS, "1", 1.0)
 
 
 class Quantity:
-    """Magnitud física con incertidumbre estándar (1 sigma)."""
+    """Physical quantity with standard uncertainty (1 sigma)."""
     __array_priority__ = 1000
 
     def __init__(self, value, unit: Unit, error=None):
@@ -74,6 +109,16 @@ class Quantity:
     @property
     def units(self):
         return self.unit
+
+    def set_error(self, error):
+        """Easily modifies the quantity's error."""
+        if isinstance(error, Quantity):
+            error = error.convert_to(self.unit).value
+        if error is None:
+            self.error = np.zeros_like(self.value, dtype=float)
+        else:
+            self.error = np.broadcast_to(np.asarray(error, dtype=float), self.value.shape).copy()
+        return self
 
     def __str__(self):
         if np.any(self.error != 0):
@@ -103,7 +148,7 @@ class Quantity:
 
     def convert_to(self, target_unit: Unit):
         if self.unit.dimension != target_unit.dimension:
-            raise ValueError("No se pueden convertir unidades de distinta dimensión.")
+            raise ValueError(f"Cannot convert units of different dimensions: {self.unit.dimension} vs {target_unit.dimension}.")
         base_value = self.value * self.unit.factor + self.unit.offset
         target_value = (base_value - target_unit.offset) / target_unit.factor
         target_error = self.error * abs(self.unit.factor / target_unit.factor)
@@ -113,7 +158,7 @@ class Quantity:
 
     def _coerce_additive(self, other):
         if not isinstance(other, Quantity):
-            raise TypeError("La suma y la resta requieren otra Quantity con unidades compatibles.")
+            raise TypeError("Addition and subtraction require another Quantity with compatible units.")
         return other.convert_to(self.unit)
 
     def __add__(self, other):
@@ -134,7 +179,7 @@ class Quantity:
     def __rsub__(self, other):
         if isinstance(other, Quantity):
             return other.__sub__(self)
-        raise TypeError("La resta requiere magnitudes con unidades compatibles.")
+        raise TypeError("Subtraction requires quantities with compatible units.")
 
     def __neg__(self):
         return Quantity(-self.value, self.unit, self.error)
@@ -182,8 +227,8 @@ class Quantity:
         val = arr / self.value
         with np.errstate(divide="ignore", invalid="ignore"):
             err = np.abs(arr / self.value**2) * self.error
-        inv_unit = Unit(DIMENSIONLESS / self.unit.dimension,
-                        f"1/{self.unit.symbol}", 1 / self.unit.factor)
+        inv_dim = DIMENSIONLESS / self.unit.dimension
+        inv_unit = Unit(inv_dim, None, 1 / self.unit.factor)
         return Quantity(val, inv_unit, err)
 
     def __pow__(self, n):
@@ -199,7 +244,7 @@ class Quantity:
     def mean(self, *args, **kwargs):
         axis = kwargs.get("axis", args[0] if args else None)
         count = self.value.size if axis is None else self.value.shape[axis]
-        err = np.sqrt(np.sum(self.error**2, axis=axis, **{k:v for k,v in kwargs.items() if k != "axis"})) / max(count, 1)
+        err = np.sqrt(np.sum(self.error**2, axis=axis, **{k: v for k, v in kwargs.items() if k != "axis"})) / max(count, 1)
         return Quantity(np.mean(self.value, *args, **kwargs), self.unit, err)
 
     def min(self, *args, **kwargs):
@@ -215,7 +260,6 @@ class Quantity:
                                            axis=kwargs.get("axis", 0)).squeeze() if kwargs.get("axis", None) is not None else self.error.flat[idx])
 
     def std(self, *args, **kwargs):
-        # Propagación de incertidumbre de la desviación típica muestral/poblacional.
         axis = kwargs.get("axis", args[0] if args else None)
         mean = np.mean(self.value, axis=axis, keepdims=True)
         std = np.std(self.value, *args, **kwargs)
@@ -251,3 +295,173 @@ class Quantity:
             return np.array_equal(self.value, other.convert_to(self.unit).value)
         except (ValueError, TypeError):
             return False
+
+
+# ==============================================================================
+# MATHEMATICAL FUNCTIONS WITH DIMENSION VALIDATION AND ERROR PROPAGATION
+# ==============================================================================
+
+def _ensure_angular(x: Quantity) -> Quantity:
+    """Validates that input x has ANGULAR dimension and converts to radians."""
+    if not isinstance(x, Quantity):
+        raise TypeError("Argument must be a Quantity.")
+    if x.unit.dimension != ANGULAR:
+        raise ValueError(f"Argument must have ANGULAR dimension, got {x.unit.dimension}.")
+    return x.convert_to(RADIAN)
+
+
+def _ensure_dimensionless(x: Quantity) -> Quantity:
+    """Validates that input x is DIMENSIONLESS."""
+    if not isinstance(x, Quantity):
+        raise TypeError("Argument must be a Quantity.")
+    if x.unit.dimension != DIMENSIONLESS:
+        raise ValueError(f"Argument must be DIMENSIONLESS, got {x.unit.dimension}.")
+    return x.convert_to(DIMENSIONLESS_UNIT)
+
+
+# ------------------------------------------------------------------------------
+# Trigonometric Functions (Require ANGULAR dimension, return DIMENSIONLESS)
+# ------------------------------------------------------------------------------
+
+def sin(x: Quantity) -> Quantity:
+    rad = _ensure_angular(x)
+    val = np.sin(rad.value)
+    err = np.abs(np.cos(rad.value)) * rad.error
+    return Quantity(val, DIMENSIONLESS_UNIT, err)
+
+
+def cos(x: Quantity) -> Quantity:
+    rad = _ensure_angular(x)
+    val = np.cos(rad.value)
+    err = np.abs(np.sin(rad.value)) * rad.error
+    return Quantity(val, DIMENSIONLESS_UNIT, err)
+
+
+def tan(x: Quantity) -> Quantity:
+    rad = _ensure_angular(x)
+    val = np.tan(rad.value)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        err = np.abs(1.0 / np.cos(rad.value)**2) * rad.error
+    return Quantity(val, DIMENSIONLESS_UNIT, np.nan_to_num(err, nan=0.0, posinf=0.0))
+
+
+# ------------------------------------------------------------------------------
+# Inverse Trigonometric Functions (Require DIMENSIONLESS, return ANGULAR in radians)
+# ------------------------------------------------------------------------------
+
+def asin(x: Quantity) -> Quantity:
+    q = _ensure_dimensionless(x)
+    val = np.arcsin(q.value)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        err = (1.0 / np.sqrt(1.0 - q.value**2)) * q.error
+    return Quantity(val, RADIAN, np.nan_to_num(err, nan=0.0, posinf=0.0))
+
+
+def acos(x: Quantity) -> Quantity:
+    q = _ensure_dimensionless(x)
+    val = np.arccos(q.value)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        err = (1.0 / np.sqrt(1.0 - q.value**2)) * q.error
+    return Quantity(val, RADIAN, np.nan_to_num(err, nan=0.0, posinf=0.0))
+
+
+def atan(x: Quantity) -> Quantity:
+    q = _ensure_dimensionless(x)
+    val = np.arctan(q.value)
+    err = (1.0 / (1.0 + q.value**2)) * q.error
+    return Quantity(val, RADIAN, err)
+
+
+def atan2(y: Quantity, x: Quantity) -> Quantity:
+    if not isinstance(y, Quantity) or not isinstance(x, Quantity):
+        raise TypeError("Both arguments for atan2 must be Quantity objects.")
+    if y.unit.dimension != x.unit.dimension:
+        raise ValueError("Arguments for atan2 must have matching dimensions.")
+    x_conv = x.convert_to(y.unit)
+    val = np.arctan2(y.value, x_conv.value)
+    denom = y.value**2 + x_conv.value**2
+    with np.errstate(divide="ignore", invalid="ignore"):
+        err = np.sqrt((x_conv.value * y.error)**2 + (y.value * x_conv.error)**2) / denom
+    return Quantity(val, RADIAN, np.nan_to_num(err, nan=0.0, posinf=0.0))
+
+
+# ------------------------------------------------------------------------------
+# Hyperbolic Functions (Require DIMENSIONLESS or ANGULAR, return DIMENSIONLESS)
+# ------------------------------------------------------------------------------
+
+def sinh(x: Quantity) -> Quantity:
+    q = _ensure_dimensionless(x) if x.unit.dimension == DIMENSIONLESS else _ensure_angular(x)
+    val = np.sinh(q.value)
+    err = np.abs(np.cosh(q.value)) * q.error
+    return Quantity(val, DIMENSIONLESS_UNIT, err)
+
+
+def cosh(x: Quantity) -> Quantity:
+    q = _ensure_dimensionless(x) if x.unit.dimension == DIMENSIONLESS else _ensure_angular(x)
+    val = np.cosh(q.value)
+    err = np.abs(np.sinh(q.value)) * q.error
+    return Quantity(val, DIMENSIONLESS_UNIT, err)
+
+
+def tanh(x: Quantity) -> Quantity:
+    q = _ensure_dimensionless(x) if x.unit.dimension == DIMENSIONLESS else _ensure_angular(x)
+    val = np.tanh(q.value)
+    err = (1.0 / np.cosh(q.value)**2) * q.error
+    return Quantity(val, DIMENSIONLESS_UNIT, err)
+
+
+# ------------------------------------------------------------------------------
+# Exponential and Logarithmic Functions (Require DIMENSIONLESS, return DIMENSIONLESS)
+# ------------------------------------------------------------------------------
+
+def exp(x: Quantity) -> Quantity:
+    q = _ensure_dimensionless(x)
+    val = np.exp(q.value)
+    err = val * q.error
+    return Quantity(val, DIMENSIONLESS_UNIT, err)
+
+
+def log(x: Quantity) -> Quantity:
+    q = _ensure_dimensionless(x)
+    val = np.log(q.value)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        err = (1.0 / np.abs(q.value)) * q.error
+    return Quantity(val, DIMENSIONLESS_UNIT, np.nan_to_num(err, nan=0.0, posinf=0.0))
+
+
+def log10(x: Quantity) -> Quantity:
+    q = _ensure_dimensionless(x)
+    val = np.log10(q.value)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        err = (1.0 / (np.abs(q.value) * np.log(10))) * q.error
+    return Quantity(val, DIMENSIONLESS_UNIT, np.nan_to_num(err, nan=0.0, posinf=0.0))
+
+
+def log2(x: Quantity) -> Quantity:
+    q = _ensure_dimensionless(x)
+    val = np.log2(q.value)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        err = (1.0 / (np.abs(q.value) * np.log(2))) * q.error
+    return Quantity(val, DIMENSIONLESS_UNIT, np.nan_to_num(err, nan=0.0, posinf=0.0))
+
+
+# ------------------------------------------------------------------------------
+# Roots and Power Functions (Accept any dimension)
+# ------------------------------------------------------------------------------
+
+def sqrt(x: Quantity) -> Quantity:
+    if not isinstance(x, Quantity):
+        raise TypeError("Argument must be a Quantity.")
+    val = np.sqrt(x.value)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        err = (0.5 / np.sqrt(x.value)) * x.error
+    return Quantity(val, x.unit ** 0.5, np.nan_to_num(err, nan=0.0, posinf=0.0))
+
+
+def cbrt(x: Quantity) -> Quantity:
+    if not isinstance(x, Quantity):
+        raise TypeError("Argument must be a Quantity.")
+    val = np.cbrt(x.value)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        err = (1.0 / (3.0 * np.cbrt(x.value)**2)) * x.error
+    return Quantity(val, x.unit ** (1.0 / 3.0), np.nan_to_num(err, nan=0.0, posinf=0.0))

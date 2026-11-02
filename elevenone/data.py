@@ -3,27 +3,84 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 from .unit import Quantity, Unit
+from .dimension import DIMENSIONLESS
+from .styles import DEFAULT_STYLES
 
 class Data:
-    _primary_color = "#00ccff"
-    _secondary_color = "#ff2ad4"
-    _facecolor = "#fcfcfc"
-    _figure_facecolor = "#ffffff"
-    _grid_color = "#ebebeb"
-    _text_color = "#1a1a1a"
-    _error_color = "#888888"
+    _styles = DEFAULT_STYLES.copy()
+    _current_style = "elevenone"
+
+    _primary_color = DEFAULT_STYLES["elevenone"]["primary"]
+    _secondary_color = DEFAULT_STYLES["elevenone"]["secondary"]
+    _facecolor = DEFAULT_STYLES["elevenone"]["facecolor"]
+    _figure_facecolor = DEFAULT_STYLES["elevenone"]["figure_facecolor"]
+    _grid_color = DEFAULT_STYLES["elevenone"]["grid_color"]
+    _text_color = DEFAULT_STYLES["elevenone"]["text_color"]
+    _error_color = DEFAULT_STYLES["elevenone"]["error_color"]
 
     @classmethod
-    def set_theme(cls, primary="#00ccff", secondary="#ff2ad4", facecolor="#fcfcfc", 
-                  figure_facecolor="#ffffff", grid_color="#ebebeb", text_color="#1a1a1a", error_color="#888888"):
-        cls._primary_color = primary
-        cls._secondary_color = secondary
-        cls._facecolor = facecolor
-        cls._figure_facecolor = figure_facecolor
-        cls._grid_color = grid_color
-        cls._text_color = text_color
-        cls._error_color = error_color
+    def register_style(cls, name: str, primary: str = "#00ccff", secondary: str = "#ff2ad4", 
+                       facecolor: str = "#fcfcfc", figure_facecolor: str = "#ffffff", 
+                       grid_color: str = "#ebebeb", text_color: str = "#1a1a1a", error_color: str = "#888888"):
+        """Registra o actualiza un estilo personalizado en el catálogo de estilos."""
+        cls._styles[name] = {
+            "primary": primary,
+            "secondary": secondary,
+            "facecolor": facecolor,
+            "figure_facecolor": figure_facecolor,
+            "grid_color": grid_color,
+            "text_color": text_color,
+            "error_color": error_color
+        }
+
+    @classmethod
+    def list_styles(cls):
+        """Devuelve la lista de nombres de estilos disponibles."""
+        return list(cls._styles.keys())
+
+    @classmethod
+    def set_style(cls, style_name: str = None, **kwargs):
+        """Establece el estilo visual cargando uno guardado o especificando colores directamente.
+        
+        Parámetros
+        ----------
+        style_name : str, opcional
+            Nombre del estilo predefinido o registrado a cargar (ej. 'elevenone', 'dark_mode').
+        **kwargs :
+            Permite sobrescribir atributos individuales del estilo (primary, secondary, facecolor, 
+            figure_facecolor, grid_color, text_color, error_color).
+        """
+        if style_name is not None:
+            if style_name not in cls._styles:
+                raise ValueError(f"Estilo '{style_name}' no encontrado. Estilos disponibles: {cls.list_styles()}")
+            style_dict = cls._styles[style_name].copy()
+            cls._current_style = style_name
+        else:
+            style_dict = cls._styles[cls._current_style].copy()
+
+        style_dict.update({k: v for k, v in kwargs.items() if k in style_dict})
+
+        cls._primary_color = style_dict["primary"]
+        cls._secondary_color = style_dict["secondary"]
+        cls._facecolor = style_dict["facecolor"]
+        cls._figure_facecolor = style_dict["figure_facecolor"]
+        cls._grid_color = style_dict["grid_color"]
+        cls._text_color = style_dict["text_color"]
+        cls._error_color = style_dict["error_color"]
+
         cls._apply_global_rc_params()
+
+    @classmethod
+    def set_theme(cls, *args, **kwargs):
+        """Alias retrocompatible para set_style."""
+        if args and isinstance(args[0], str) and args[0] in cls._styles:
+            cls.set_style(args[0], **kwargs)
+        else:
+            if args:
+                keys = ["primary", "secondary", "facecolor", "figure_facecolor", "grid_color", "text_color", "error_color"]
+                for k, v in zip(keys, args):
+                    kwargs[k] = v
+            cls.set_style(style_name=None, **kwargs)
 
     @classmethod
     def _apply_global_rc_params(cls):
@@ -233,17 +290,59 @@ class Data:
             new_dict[new_key] = v
         return Data(new_dict)
 
-    def __setitem__(self, key, value):
-        if isinstance(value, Quantity):
-            col_data = value
-        elif isinstance(value, (list, np.ndarray, tuple)):
-            col_data = np.asarray(value)
+    def set_error(self, columns, errors):
+        if isinstance(columns, str):
+            columns = [columns]
+
+        if isinstance(errors, dict):
+            for col, err in errors.items():
+                if col not in self.dict:
+                    raise KeyError(f"Columna '{col}' no encontrada en Data.")
+                val = self.dict[col]
+                if isinstance(val, Quantity):
+                    val.set_error(err)
+                else:
+                    self.dict[col] = Quantity(val, Unit(DIMENSIONLESS), err)
         else:
-            col_data = np.asarray([value])
-        
+            for col in columns:
+                if col not in self.dict:
+                    raise KeyError(f"Columna '{col}' no encontrada en Data.")
+                val = self.dict[col]
+                if isinstance(val, Quantity):
+                    val.set_error(errors)
+                else:
+                    self.dict[col] = Quantity(val, Unit(DIMENSIONLESS), errors)
+        return self
+
+    def __setitem__(self, key, value):
+        if self._length is not None:
+            if isinstance(value, Quantity):
+                val = np.atleast_1d(value.value)
+                err = np.atleast_1d(value.error)
+                if len(val) == 1 and self._length > 1:
+                    val_arr = np.full(self._length, val[0])
+                    err_arr = np.full(self._length, err[0])
+                    col_data = Quantity(val_arr, value.unit, err_arr)
+                else:
+                    col_data = value
+            else:
+                arr = np.asarray(value)
+                if arr.ndim == 0 or (arr.ndim == 1 and len(arr) == 1 and self._length > 1):
+                    scalar_val = arr.item() if arr.ndim == 0 else arr[0]
+                    col_data = np.full(self._length, scalar_val)
+                else:
+                    col_data = arr
+        else:
+            if isinstance(value, Quantity):
+                col_data = value
+            elif isinstance(value, (list, np.ndarray, tuple)):
+                col_data = np.asarray(value)
+            else:
+                col_data = np.asarray([value])
+
         if self._length is not None and len(col_data) != self._length:
-            raise ValueError("The new column does not match the length of the other data.")
-        
+            raise ValueError(f"La longitud de los nuevos datos ({len(col_data)}) no coincide con la del Data ({self._length}).")
+
         if self._length is None:
             self._length = len(col_data)
 
@@ -284,8 +383,6 @@ class Data:
         for col_name, col_data in self.dict.items():
             if isinstance(col_data, Quantity):
                 representation_dict[f"{col_name} [{col_data.unit.symbol}]"] = col_data.value
-                # La incertidumbre se muestra siempre, incluso si vale cero:
-                # así la estructura de la tabla no depende de los datos.
                 representation_dict[f"{col_name}_err"] = col_data.error
             else:
                 representation_dict[col_name] = col_data
@@ -363,10 +460,6 @@ class Data:
         data_for_corr = {k: (v.value if isinstance(v, Quantity) else v) for k, v in num_cols.items()}
         return pd.DataFrame(data_for_corr).corr()
 
-    # =========================================================================
-    # PLOTTING METHODS CON SOPORTE DE BARRAS DE ERROR
-    # =========================================================================
-
     def _get_plot_series(self, col_name: str):
         if col_name not in self.dict:
             raise KeyError(f"Column '{col_name}' not found in Data.")
@@ -430,7 +523,7 @@ class Data:
         if markersize:
             markersize = 0 if len(x_vals) > 25 else 4.5
 
-        if np.any(y_errs != 0) or np.any(x_errs != 0):
+        if (np.any(y_errs != 0) or np.any(x_errs != 0)) and len(x_vals) <= 25:
             ax.errorbar(x_vals, y_vals, yerr=y_errs if np.any(y_errs!=0) else None, 
                         xerr=x_errs if np.any(x_errs!=0) else None, fmt='none', ecolor=self._error_color, 
                         elinewidth=1.2, capsize=3, zorder=2)
@@ -453,7 +546,10 @@ class Data:
 
         scatter_color = color if color is not None else self._primary_color
         
-        if np.any(y_errs != 0) or np.any(x_errs != 0):
+        if s == 45 and len(x_vals) > 25:
+            s = 15
+
+        if (np.any(y_errs != 0) or np.any(x_errs != 0)) and len(x_vals) <= 25:
             ax.errorbar(x_vals, y_vals, yerr=y_errs if np.any(y_errs!=0) else None, 
                         xerr=x_errs if np.any(x_errs!=0) else None, fmt='none', ecolor=self._error_color, 
                         elinewidth=1.2, capsize=3, zorder=2)
@@ -485,8 +581,11 @@ class Data:
         main_color = color if color is not None else self._primary_color
         err_color = ecolor if ecolor is not None else self._secondary_color
 
+        actual_capsize = capsize if len(x_vals) <= 25 else 0
+        actual_elinewidth = 1.5 if len(x_vals) <= 25 else 0.8
+
         ax.errorbar(x_vals, y_vals, yerr=yerr_vals, xerr=xerr_vals, fmt='o', color=main_color, 
-                    ecolor=err_color, elinewidth=1.5, capsize=capsize, capthick=1.5, zorder=3, **kwargs)
+                    ecolor=err_color, elinewidth=actual_elinewidth, capsize=actual_capsize, capthick=actual_elinewidth, zorder=3, **kwargs)
 
         self._format_labels(ax, xlabel or x_label, ylabel or y_label, title)
         if grid: self._apply_grid(ax)
@@ -501,7 +600,8 @@ class Data:
         fig, ax = self._init_plot_figure(ax, figsize)
 
         bar_color = color if color is not None else self._primary_color
-        if np.any(y_errs != 0):
+        
+        if np.any(y_errs != 0) and len(x_vals) <= 25:
             ax.bar(x_vals, y_vals, yerr=y_errs, capsize=3, ecolor=self._secondary_color, color=bar_color, width=width, edgecolor='none', zorder=3, **kwargs)
         else:
             ax.bar(x_vals, y_vals, color=bar_color, width=width, edgecolor='none', zorder=3, **kwargs)
@@ -597,7 +697,9 @@ class Data:
 
         fig, ax = self._init_plot_figure(ax, figsize)
         ax.axhline(0, color=self._secondary_color, linestyle='--', linewidth=1.5, zorder=2)
-        ax.scatter(x_vals, residuals, color=self._primary_color, s=45, zorder=3, **kwargs)
+        
+        scatter_s = 45 if len(x_vals) <= 25 else 15
+        ax.scatter(x_vals, residuals, color=self._primary_color, s=scatter_s, zorder=3, **kwargs)
 
         self._format_labels(ax, x_label, f"Residuals ({y_label})", title)
         if grid: self._apply_grid(ax)
@@ -624,7 +726,8 @@ class Data:
                 else:
                     x_vals, _, _ = self._get_plot_series(cols[j])
                     y_vals, _, _ = self._get_plot_series(cols[i])
-                    ax.scatter(x_vals, y_vals, color=self._primary_color, s=20, alpha=0.7, edgecolors='none')
+                    point_s = 20 if len(x_vals) <= 25 else 8
+                    ax.scatter(x_vals, y_vals, color=self._primary_color, s=point_s, alpha=0.7, edgecolors='none')
 
                 for spine in ax.spines.values():
                     spine.set_color('#d0d0d0')
@@ -683,18 +786,6 @@ class Data:
         return fig, ax
 
     def generate_report(self, output_path, format_type="html", **kwargs):
-        """Generate a scientific report in HTML or PDF format.
-
-        Parameters
-        ----------
-        output_path : str
-            Destination file path.
-        format_type : {"html", "pdf"}, default="html"
-            Report output format. PDF export uses ReportLab directly.
-        **kwargs
-            Additional options forwarded to the report generator (for example
-            ``title``, ``author`` or ``logo_path``).
-        """
         from .report import generate_report
         return generate_report(
             self, output_path=output_path, format_type=format_type, **kwargs

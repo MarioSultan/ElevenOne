@@ -9,7 +9,7 @@ from . import basic_units
 
 
 class Loader:
-    """Carga CSV/Excel y asocia automáticamente columnas de incertidumbre."""
+    """Loads CSV/Excel files and automatically associates uncertainty columns."""
 
     def __init__(self):
         self.unit_registry = {}
@@ -17,20 +17,20 @@ class Loader:
             attr = getattr(basic_units, attr_name)
             if isinstance(attr, Unit):
                 self.unit_registry[attr.symbol] = attr
-                # También permite usar el nombre Python de la unidad.
+                # Also allows using the unit's Python name.
                 self.unit_registry.setdefault(attr_name, attr)
 
         self.sorted_symbols = sorted(self.unit_registry, key=len, reverse=True)
 
     def _parse_unit_expression(self, expression):
-        """Evalúa expresiones de unidades sin ejecutar código arbitrario."""
+        """Evaluates unit expressions without executing arbitrary code."""
         expr = expression.strip().replace("·", "*").replace("⋅", "*")
         expr = expr.replace("²", "**2").replace("³", "**3")
         expr = expr.replace("^", "**").replace(" ", "")
         if not expr:
             return None
 
-        # AST restringido: nombres registrados, 1, multiplicación, división y potencias.
+        # Restricted AST: registered names, 1, multiplication, division, and powers.
         try:
             tree = ast.parse(expr, mode="eval")
         except SyntaxError:
@@ -66,21 +66,21 @@ class Loader:
         return result if isinstance(result, Unit) else None
 
     def _find_unit_in_string(self, text):
-        """Extrae unidades de nombres/celdas: 'Tiempo (s)', 'Velocidad [m/s]', '2 m/s'."""
+        """Extracts units from names/cells: 'Time (s)', 'Velocity [m/s]', '2 m/s'."""
         if not isinstance(text, str):
             return None, text
         cleaned = text.strip()
 
-        # Unidad entre delimitadores. Se intenta de derecha a izquierda para
-        # permitir nombres que contengan paréntesis no relacionados con unidades.
+        # Unit between delimiters. Tries from right to left to allow names
+        # containing parentheses unrelated to units.
         for match in reversed(list(re.finditer(r"[\(\[\{]([^\)\]\}]+)[\)\]\}]", cleaned))):
             unit = self._parse_unit_expression(match.group(1))
             if unit is not None:
                 base = (cleaned[:match.start()] + cleaned[match.end():]).strip()
                 return unit, base
 
-        # Unidad al final separada por espacio: "velocidad m/s" o "12 kg·m/s²".
-        # Los exponentes Unicode más habituales se traducen a potencias.
+        # Unit at the end separated by space: "velocity m/s" or "12 kg·m/s²".
+        # Most common Unicode exponents are translated to powers.
         normalized = cleaned.replace("²", "**2").replace("³", "**3")
         for split in range(len(normalized) - 1, 0, -1):
             if not normalized[split].isspace():
@@ -92,11 +92,11 @@ class Loader:
         return None, cleaned
 
     def _parse_error_column_name(self, col_name):
-        """Devuelve (nombre_base, unidad_error) si el nombre es una incertidumbre."""
+        """Returns (base_name, error_unit) if the column name represents an uncertainty."""
         cleaned = str(col_name).strip()
         suffix = r"(?:err|error|unc|uncertainty|uncert|sigma)"
 
-        # Caso habitual: tiempo_err (s), tiempo_error [ms], etc.
+        # Common case: time_err (s), time_error [ms], etc.
         match = re.match(
             rf"^(.*?)[\s_-]+{suffix}\s*(?:[\(\[\{{](.*?)[\)\]\}}])?$",
             cleaned, re.IGNORECASE
@@ -108,14 +108,14 @@ class Loader:
                 unit, base = self._find_unit_in_string(base)
             return base, unit
 
-        # También admite tiempo (s)_err o tiempo [s]_err.
+        # Also supports time (s)_err or time [s]_err.
         match = re.match(rf"^(.*?)[\s_-]+{suffix}$", cleaned, re.IGNORECASE)
         if match:
             base_with_unit = match.group(1).strip()
             unit, base = self._find_unit_in_string(base_with_unit)
             return base, unit
 
-        # Formas tiempo (err) y tiempo [err].
+        # Forms time (err) and time [err].
         unit, base = self._find_unit_in_string(cleaned)
         for pattern in (rf"^(.*?)\s*\({suffix}\)$", rf"^(.*?)\s*\[{suffix}\]$"):
             match = re.match(pattern, base, re.IGNORECASE)
@@ -151,7 +151,7 @@ class Loader:
                     if unit_from_cells is None:
                         unit_from_cells = cell_unit
                     elif cell_unit.dimension != unit_from_cells.dimension:
-                        raise ValueError(f"Unidades incompatibles en la columna '{col_name}'.")
+                        raise ValueError(f"Incompatible units in column '{col_name}'.")
                     else:
                         number *= cell_unit.factor / unit_from_cells.factor
                 values.append(number)
@@ -168,7 +168,7 @@ class Loader:
 
 
 def load_data(filepath, sheet_name=0, **kwargs):
-    """Carga CSV/Excel, reconoce incertidumbres y devuelve un objeto Data."""
+    """Loads CSV/Excel, recognizes uncertainties, and returns a Data object."""
     loader = Loader()
     path = str(filepath).lower()
 
@@ -192,12 +192,12 @@ def load_data(filepath, sheet_name=0, **kwargs):
         parsed[original_name] = (clean_name, parsed_data)
         original_to_clean[original_name] = clean_name
 
-    # Primero se identifican todas las columnas de error.
+    # First, identify all error columns.
     for original_name, (clean_name, values) in parsed.items():
         base_name, error_unit = loader._parse_error_column_name(original_name)
         if base_name is None:
             continue
-        # El nombre de la magnitud puede llevar unidad en su propio encabezado.
+        # The quantity name might contain a unit in its own header.
         _, clean_base = loader._find_unit_in_string(base_name)
         if clean_base != base_name:
             base_name = clean_base
@@ -227,13 +227,13 @@ def load_data(filepath, sheet_name=0, **kwargs):
                 converted_error = error_quantity.convert_to(values.unit)
                 error_array = converted_error.value
             else:
-                # Si no se especificó unidad en la columna _err, se entiende
-                # que está expresada en la unidad de la magnitud.
+                # If no unit was specified in the _err column, it is understood
+                # to be expressed in the quantity's unit.
                 error_array = np.asarray(error_values, dtype=float)
             data_dict[clean_name] = Quantity(values.value, values.unit, error_array)
         else:
-            # Si la columna principal no declara unidad pero _err sí, se
-            # interpreta que ambas están expresadas en esa unidad.
+            # If the main column doesn't declare a unit but _err does,
+            # interpret both as being expressed in that unit.
             if error_quantity is not None:
                 unit = error_quantity.unit
                 error_array = error_quantity.value
@@ -241,8 +241,8 @@ def load_data(filepath, sheet_name=0, **kwargs):
                 unit = getattr(basic_units, "counts", None)
                 if unit is None:
                     raise ValueError(
-                        f"La columna '{error_col}' tiene incertidumbre, pero "
-                        f"'{clean_name}' no tiene unidad y basic_units.counts no existe."
+                        f"Column '{error_col}' has uncertainty, but "
+                        f"'{clean_name}' has no unit and basic_units.counts does not exist."
                     )
                 error_array = np.asarray(error_values, dtype=float)
             data_dict[clean_name] = Quantity(values, unit, error_array)
