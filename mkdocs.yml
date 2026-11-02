@@ -78,6 +78,7 @@ nav:
   - Physical quantities and units:
       - Basic usage: basic_usage.md
       - Quantities, units and uncertainties: quantities_units_and_uncertainties.md
+      # - Unit packages: unit_packages.md
       # - Physical constants: physical_constants.md
 
   - Data:
@@ -102,7 +103,13 @@ nav:
       - Report generator: report.md
 
   - Data fitting:
-      - Linear fit: linear_fit.md
+      - Data fit and fir results: fitting.md
+      - Linear fit: fit_linear.md
+      - Polynomial fit: fit_polynomial.md
+      - Exponential fit: fit_exponential.md
+      - Power law fit: fit_power_law.md
+      - Logarithmic fit: fit_logarithmic.md
+      - Custom fit: fit_custom.md
 
 
 # ---------- Custom styling ----------
