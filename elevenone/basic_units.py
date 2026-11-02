@@ -110,3 +110,4 @@ deg  = Unit(ANGULAR, "deg", 0.0174533)
 
 # --- Otros ---
 counts = Unit(DIMENSIONLESS, "counts", 1)
+Hz = Unit(FREQUENCY, "Hz", 1)
