@@ -499,3 +499,162 @@
       );
   }
 }
+
+
+
+/* ==========================================================================
+   16. Expandable sections — ElevenOne
+   CYAN LABORATORY
+   ========================================================================== */
+
+/* Main container */
+.md-typeset details {
+    border: 1px solid var(--eo-cyan-border);
+    border-left: 4px solid var(--eo-cyan);
+    border-radius: 8px;
+    background: var(--eo-cyan-pale);
+    overflow: hidden;
+    margin: 1.2em 0;
+
+    box-shadow: 0 3px 12px rgba(0, 204, 255, 0.06);
+
+    transition:
+        border-color 200ms ease,
+        box-shadow 200ms ease,
+        background 200ms ease;
+}
+
+/* Summary / clickable heading */
+.md-typeset details > summary {
+    padding: 0.85em 1.1em;
+    font-weight: 700;
+    color: var(--eo-ink);
+    background: var(--eo-cyan-soft);
+    cursor: pointer;
+
+    transition:
+        background 200ms ease,
+        color 200ms ease;
+}
+
+/* Remove default annotation icon */
+.md-typeset details > summary::before {
+    display: none;
+}
+
+/* Custom expand indicator */
+.md-typeset details > summary::after {
+    background-color: var(--eo-pink);
+
+    transition:
+        background-color 200ms ease,
+        transform 200ms ease;
+}
+
+/* Remove unwanted icons */
+.md-typeset details > summary .twemoji,
+.md-typeset details > summary svg {
+    display: none;
+}
+
+/* --------------------------------------------------------------------------
+   HOVER — Pink interaction
+   -------------------------------------------------------------------------- */
+
+.md-typeset details:hover {
+    border-color: var(--eo-pink);
+    border-left-color: var(--eo-pink);
+
+    box-shadow:
+        0 4px 18px rgba(255, 42, 212, 0.13);
+}
+
+.md-typeset details > summary:hover {
+    background: var(--eo-pink-soft);
+    color: var(--eo-ink);
+}
+
+.md-typeset details:hover > summary::after {
+    background-color: var(--eo-pink);
+}
+
+/* --------------------------------------------------------------------------
+   CONTENT
+   -------------------------------------------------------------------------- */
+
+.md-typeset details > *:not(summary) {
+    margin-left: 1.1em;
+    margin-right: 1.1em;
+}
+
+.md-typeset details > :last-child {
+    margin-bottom: 1em;
+}
+
+/* --------------------------------------------------------------------------
+   OPEN STATE
+   -------------------------------------------------------------------------- */
+
+.md-typeset details[open] {
+    border-color: var(--eo-cyan);
+    border-left-color: var(--eo-cyan);
+
+    box-shadow:
+        0 4px 18px rgba(0, 204, 255, 0.11);
+}
+
+.md-typeset details[open] > summary {
+    border-bottom: 1px solid var(--eo-cyan-border);
+    background: var(--eo-cyan-soft);
+}
+
+/* Open + hover */
+.md-typeset details[open]:hover {
+    border-color: var(--eo-pink);
+    border-left-color: var(--eo-pink);
+
+    box-shadow:
+        0 4px 20px rgba(255, 42, 212, 0.14);
+}
+
+.md-typeset details[open]:hover > summary {
+    background: var(--eo-pink-soft);
+    border-bottom-color: var(--eo-pink-border);
+}
+
+/* --------------------------------------------------------------------------
+   DARK MODE
+   -------------------------------------------------------------------------- */
+
+[data-md-color-scheme="slate"] .md-typeset details {
+    background: var(--eo-surface);
+    border-color: var(--eo-cyan-border);
+    border-left-color: var(--eo-cyan);
+}
+
+[data-md-color-scheme="slate"] .md-typeset details > summary {
+    background: rgba(0, 204, 255, 0.10);
+    color: var(--eo-ink);
+}
+
+[data-md-color-scheme="slate"] .md-typeset details[open] > summary {
+    background: rgba(0, 204, 255, 0.10);
+}
+
+/* Dark mode hover */
+[data-md-color-scheme="slate"] .md-typeset details:hover {
+    border-color: var(--eo-pink);
+    border-left-color: var(--eo-pink);
+
+    box-shadow:
+        0 4px 20px rgba(255, 42, 212, 0.16);
+}
+
+[data-md-color-scheme="slate"] .md-typeset details > summary:hover {
+    background: rgba(255, 42, 212, 0.12);
+}
+
+[data-md-color-scheme="slate"] .md-typeset details[open]:hover > summary {
+    background: rgba(255, 42, 212, 0.12);
+}
+
