@@ -52,7 +52,7 @@ Discover everything you can do with ElevenOne here:
     - [Quantities, units and uncertainties](quantities_units_and_uncertainties.md)
     - [Unit systems](unit_systems.md)
 
-??? "Data"
+??? "Data analysis"
 
     - [Data structures](data_structures.md)
     - [Load data](load_data.md)
