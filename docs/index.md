@@ -77,7 +77,13 @@ Discover everything you can do with ElevenOne here:
 
 ???+ "Data fitting"
 
-    - [Linear fit](linear_fit.md)
+    - [Data fit and fit results](fitting.md)
+    - [Linear fit](fit_linear.md)
+    - [Polynomial fit](fit_polynomial.md)
+    - [Exponential fit](fit_exponential.md)
+    - [Power law fit](fit_power_law.md)
+    - [Logarithmic fit](fit_logarithmic.md)
+    - [Custom fit](fit_custom.md)
 
 
 ------------------------------------------------------------------------
