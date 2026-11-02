@@ -23,7 +23,8 @@ Some of the things ElevenOne can do include:
 -   Handling of physical units
 -   Automatic data loading with unit detection
 -   High-level scientific plotting and visualizations
--   Automated publication-grade scientific reports ★
+-   Automated publication-grade scientific reports
+-   Numerous models of data fitting
 
 ------------------------------------------------------------------------
 
@@ -127,13 +128,40 @@ matrices, and distribution graphs without exposing raw data lines.
 
 ------------------------------------------------------------------------
 
+## Curve Fitting & Model Optimization
+
+ElevenOne provides a flexible curve fitting module designed for scientific data analysis, featuring built-in standard models (linear, polynomial, exponential, power law and logarithmic) as well as support for custom user-defined functions. Fits preserve physical units and compute fitted parameters alongside standard errors and goodness-of-fit metrics ($R^2$, $\chi^2$).
+
+``` python
+data = Data({
+    "Time": [0.0, 1.0, 2.0, 3.0, 4.0] * s,
+    "Position": [0.2, 2.1, 4.3, 5.9, 8.2] * m
+})
+
+# Add measurement errors
+data.set_error("Time", 0.05)       # 0.05 s error on time
+data.set_error("Position", 0.2)    # 0.2 m error on position
+
+# 2. Perform linear fit
+result = fit_linear(data, x="Time", y="Position")
+
+# 3. Print complete fit summary
+print(result)
+
+# 4. Plot data, fit line, and residuals
+fig, axes = result.plot(title="Position vs. Time Fit")
+```
+
+
+------------------------------------------------------------------------
+
 ## Documentation
 
 The complete documentation, including installation instructions,
 getting-started guides, usage examples, and feature references, is
 available at:
 
-**[ElevenOne Documentation](https://elevenone.readthedocs.io/)**
+📚 [ElevenOne Documentation](https://elevenone.readthedocs.io/)
 
 ------------------------------------------------------------------------
 
