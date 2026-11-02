@@ -1,95 +1,111 @@
 # Introduction to ElevenOne
 
-**ElevenOne** is a Python library designed for laboratory data analysis, scientific computing, and experimental data handling. It bridges the gap between general-purpose data science toolkits (such as Pandas, NumPy, and Matplotlib) and physical measurement analysis by making physical dimensions, unit conversions, and uncertainty propagation first-class citizens in data workflows.
+> **Physics, Uncertainty, Data Analysis, and Automated Reporting — Unified into One Elegant Python Engine.**
+
+Stop wrestling with lost units, manual error propagation, clunky dataframes, and boilerplate plotting scripts.  
+**ElevenOne** bridges the gap between raw scientific measurements and publication-ready reporting in Python.
 
 ---
 
-## Why ElevenOne?
+## What is ElevenOne?
 
-In standard data science pipelines, datasets consist of raw floating-point numbers. Physical units and measurement uncertainties are typically tracked via manual column naming schemes (e.g., `length_m`, `time_s_err`) or auxiliary documentation. This introduces several risks:
+ElevenOne is designed for scientific computing, physics engineering, data analysis, and laboratory work. It brings together unit-aware quantities, automatic $1\sigma$ error propagation, custom dataframes, statistical fitting, and instant report generation into a single intuitive interface.
 
-- **Manual Unit Tracking Errors:** Mixing units during calculations (e.g., adding meters to feet) leads to silent, undetected errors.
-- **Manual Uncertainty Propagation:** Calculating standard error propagation ($1\sigma$) through derivatives or mathematical expressions requires repetitive, error-prone boilerplate code.
-- **Disconnected Visualization & Reporting:** Generating plots or scientific summary tables with units, error bars, and dimensional labels requires manual axis formatting and metadata extractions.
-
-**ElevenOne solves these challenges by combining data frame management, automatic unit conversion, error propagation, and physical-aware visualization into a single unified library.**
+With **over 400+ built-in physical units** (spanning fundamental SI, kinematics, electromagnetism, thermodynamics, astrophysics, and fluid dynamics), ElevenOne handles unit conversions and uncertainty calculations automatically so you can focus on the science.
 
 ---
 
-## Key Features & Capabilities
+## Key Highlights
 
-```
-+-----------------------------------------------------------------------+
-|                              ElevenOne                                |
-|                                                                       |
-|  +------------------+  +-------------------+  +--------------------+  |
-|  | Dimensional Unit |  |  Uncertainty (1σ) |  | Smart CSV / Excel  |  |
-|  | Tracking (SI/Imp)|  |    Propagation    |  | Auto-Parsing Engine|  |
-|  +--------+---------+  +---------+---------+  +---------+----------+  |
-|           |                      |                      |             |
-|           +----------------------+----------------------+             |
-|                                  |                                    |
-|                                  v                                    |
-|             +------------------------------------------+              |
-|             | Unified Data Frame Container (`Data`)    |              |
-|             +--------------------+---------------------+              |
-|                                  |                                    |
-|           +----------------------+----------------------+             |
-|           |                                             |             |
-|           v                                             v             |
-|  +--------------------+                     +----------------------+  |
-|  | Modern Matplotlib  |                     |  Automated HTML /    |  |
-|  | Plotting & Errorbars |                   |  PDF Report Generation| |
-|  +--------------------+                     +----------------------+  |
-+-----------------------------------------------------------------------+
-```
-
-### 1. First-Class Physical Quantities & Dimensions
-Every numerical quantity in ElevenOne can be associated with standard physical dimensions (Length, Mass, Time, Current, Temperature, Amount of Substance, Luminous Intensity, and Angular measure). Mathematical operations automatically scale unit factors and derive resultant physical dimensions.
-
-### 2. Automatic Uncertainty ($1\sigma$) Propagation
-All physical measurements preserve their standard uncertainties. When performing algebraic operations, mathematical transformations, or statistical aggregations (mean, standard deviation, variance, min/max), standard error propagation rules are computed dynamically under the hood.
-
-### 3. Intelligent Data Ingestion (`load_data`)
-The data loader automatically parses CSV and Excel headers as well as cell contents:
-- **Header Unit Extraction:** Column names like `Time (s)` or `Velocity [m/s]` are automatically recognized as physical quantities with their respective units.
-- **Error Column Pairing:** Columns designated with suffixes such as `_err`, `_error`, `_unc`, or `_sigma` are automatically attached to their corresponding measurement variables.
-- **Cell Unit Parsing:** Handles mixed string inputs inside tabular data (e.g., `"12.5 mA"`).
-
-### 4. Physical Data Frame Engine (`Data`)
-The core `Data` structure combines array-based filtering, indexing, query execution, and statistical summaries with dimensional safety. It ensures operations between incompatible physical dimensions (e.g., adding Mass to Time) raise immediate errors.
-
-### 5. Automated Publication-Ready Plotting
-High-level plotting functions (scatter plots, line charts, error bars, histograms, box plots, residual plots, pair plots, and correlation heatmaps) automatically:
-- Render $1\sigma$ uncertainty error bars whenever errors exist.
-- Extract unit symbols and attach them directly to axis labels.
-- Apply clean, consistent graphic themes without requiring Matplotlib setup code.
-
-### 6. Built-in Scientific Report Generation
-ElevenOne includes a dedicated reporting engine that converts any `Data` structure into an 11-section structured HTML or standalone PDF report complete with statistical summaries, distribution metrics, regression analyses, and embedded high-resolution plots.
+* **400+ Units & Physical Dimensions:** Work effortlessly with everything from kilometers ($\text{km}$) and microvolts ($\mu\text{V}$) to light-years ($\text{ly}$), atmospheres ($\text{atm}$), and farads ($\text{F}$).
+* **Automatic Error Propagation:** Every physical operation automatically calculates $1\sigma$ standard uncertainties, including through complex mathematical and trigonometric functions ($\sin$, $\cos$, $\exp$, $\log$, $\sqrt{\cdot}$, etc.).
+* **Smart Data Ingestion (`load_data`):** Automatically imports `.csv` and `.xlsx` files, recognizes unit symbols in column headers (e.g., `Time (s)`, `Voltage [mV]`), and automatically pairs data with its uncertainty columns (e.g., `time_err`).
+* **Built-in Styled Data Analysis:** `Data` objects provide statistical summaries, intuitive query filtering, and built-in visualization presets (`plot`, `scatter`, `errorbar`, `violin`, `corr_heatmap`, `pairplot`) styled instantly with customizable themes.
+* **Rigorous Curve Fitting:** Perform weighted least squares or Orthogonal Distance Regression (ODR) with `fit_linear`, `fit_polynomial`, `fit_exponential`, `fit_custom`, and more.
+* **Automated 11-Section Scientific Reports:** Export complete HTML or native PDF analytical reports with a single method call (`data.generate_report(...)`).
 
 ---
 
-## High-Level Workflow Overview
+## How It Works (At a Glance)
 
-The general operational flow of ElevenOne moves seamlessly from raw data ingestion to scientific analysis and publication:
+### 1. Physical Quantities & Automatic Uncertainty
 
+Operations automatically convert units and propagate errors:
+
+```python
+from elevenone import kg, m, s, N, sin, Quantity
+
+# Define physical values with standard uncertainties
+mass = Quantity(5.0, kg, error=0.1)      # (5.0 ± 0.1) kg
+dist = 100.0 * m                           # 100 m
+time = Quantity(10.0, s, error=0.2)       # (10.0 ± 0.2) s
+
+# Velocity & Force calculation with automatic error propagation
+velocity = dist / time                     # Output in m/s with propagated uncertainty
+force = mass * (dist / (time**2))          # Automatically resolves to Newtons (N)
+
+# Convert to target units seamlessly
+force_in_N = force.to(N)
 ```
-[ Raw CSV / Excel Dataset ]
-           │
-           ▼
-   load_data Engine ──► Auto-detects Units & Error Columns
-           │
-           ▼
-    Data Container  ──► Encapsulates Values, Units, and Uncertainties
-           │
-  ┌────────┴────────────────────────┬────────────────────────┐
-  ▼                                 ▼                        ▼
-Physical Calculations      Statistical Summaries      Publication Graphics
- & Unit Conversions         & Query Filtering        & Scientific Reports
+
+---
+
+### 2. Smart Loading & Instant Visualizations
+
+Load data files containing unit annotations and plot error-bar representations out-of-the-box:
+
+```python
+from elevenone import load_data, Data
+
+# Loads columns and automatically links uncertainty pairs (e.g., 'Voltage' & 'Voltage_err')
+data = load_data("experiment_results.csv")
+
+# Set global visual styling (e.g., 'elevenone', 'dark_mode', 'cyberpunk', 'nordic')
+Data.set_style("dark_mode")
+
+# Scatter plot with auto-detected units, error bars, and linear fit line
+fig, ax = data.scatter(x="Time", y="Voltage", fit=True)
 ```
 
-1. **Ingest:** Load experimental raw data files. ElevenOne detects physical units and pairs values with their corresponding uncertainties.
-2. **Compute:** Perform physical calculations. Units convert automatically, dimensions are derived, and uncertainties propagate at every step.
-3. **Analyze & Query:** Filter datasets using boolean masks, sort variables, and generate full statistical descriptions.
-4. **Visualize & Report:** Produce publication-ready plots with automated error bar formatting and generate full 11-section PDF/HTML documentation with a single function call.
+---
+
+### 3. Data Fitting & Automatic Parameter Units
+
+Fit theoretical models to experimental data while preserving dimension checks:
+
+```python
+from elevenone import fit_linear
+
+# Perform Orthogonal Distance Regression (ODR) or weighted least squares
+fit = fit_linear(data, x="Time", y="Voltage")
+
+# Inspect statistics (R², Reduced χ², DoF) and parameters with inferred units
+print(fit.summary())
+
+# Plot data, fit line, and residual subplots automatically
+fit.plot(show_residuals=True)
+```
+
+---
+
+### 4. One-Click Report Generation
+
+Transform your analyzed `Data` objects into comprehensive, 11-section PDF or HTML scientific documents:
+
+```python
+# Generates a complete report with overview stats, distribution plots, 
+# correlation matrices, and linear fits
+data.generate_report("final_lab_report.pdf", format_type="pdf")
+```
+
+---
+
+## How Far Can You Take ElevenOne?
+
+* **Laboratory Automation:** Ingest raw experimental outputs directly into clean data structures with standard uncertainty tracking.
+* **Physics Simulations:** Run multi-variable physical calculations without worrying about dimensional errors or manual partial derivatives.
+* **Research & Academic Publications:** Generate publication-standard figures, curve fits with full residual diagnostics, and full summary PDFs in seconds.
+
+---
+
+Ready to elevate your scientific workflow? **Give ElevenOne a spin in your next project!**
