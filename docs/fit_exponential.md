@@ -2,6 +2,8 @@
 
 The `fit_exponential` function fits exponential growth or decay models ($y = a \cdot e^{b \cdot x}$) to data with uncertainties.
 
+![Example](https://raw.githubusercontent.com/MarioSultan/ElevenOne/main/imgs/fit_exponential.png)
+
 ---
 
 ## 1. Mathematical Model
@@ -16,6 +18,7 @@ $$y(x) = a \cdot e^{b \cdot x}$$
 ## 2. Inferred Parameter Units
 
 Because exponents must be dimensionless ($[b \cdot x] = 1$):
+
 * **`a` (Amplitude)**: $[y]$
 * **`b` (Rate)**: $[x]^{-1}$
 

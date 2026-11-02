@@ -1,6 +1,8 @@
 # `fit_custom` (Custom Model Fitting)
 
-The `fit_custom` function fits any user-defined non-linear Python function $y = f(x, *params)$ to data, automatically handling errors in $x$ and $y$ via ODR or weighted least squares.
+The `fit_custom` function fits any user-defined non-linear Python function $y = f(x, *\text{params})$ to data, automatically handling errors in $x$ and $y$ via ODR or weighted least squares.
+
+![Example](https://raw.githubusercontent.com/MarioSultan/ElevenOne/main/imgs/fit_custom.png)
 
 ---
 

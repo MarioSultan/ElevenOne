@@ -2,6 +2,8 @@
 
 The `fit_linear` function performs linear regression ($y = m \cdot x + b$) on data with optional measurement errors in both $x$ and $y$.
 
+![Example](https://raw.githubusercontent.com/MarioSultan/ElevenOne/main/imgs/fit_linear.png)
+
 ---
 
 ## 1. Mathematical Model
@@ -16,6 +18,7 @@ $$y(x) = m \cdot x + b$$
 ## 2. Inferred Parameter Units
 
 Units are automatically computed from the input quantities:
+
 * **`m` (Slope)**: $[y] / [x]$
 * **`b` (Intercept)**: $[y]$
 

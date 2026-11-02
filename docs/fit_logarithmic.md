@@ -2,6 +2,8 @@
 
 The `fit_logarithmic` function fits logarithmic curves ($y = a \cdot \ln(x) + b$) to experimental data.
 
+![Example](https://raw.githubusercontent.com/MarioSultan/ElevenOne/main/imgs/fit_logarithmic.png)
+
 ---
 
 ## 1. Mathematical Model
@@ -16,6 +18,7 @@ $$y(x) = a \cdot \ln(x) + b$$
 ## 2. Inferred Parameter Units
 
 Because $\ln(x)$ is evaluated on numerical magnitude:
+
 * **`a`**: $[y]$
 * **`b`**: $[y]$
 

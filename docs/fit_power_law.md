@@ -2,6 +2,8 @@
 
 The `fit_power` function fits power-law relationships ($y = a \cdot x^b$) to experimental data with errors in both axes.
 
+![Example](https://raw.githubusercontent.com/MarioSultan/ElevenOne/main/imgs/fit_power_law.png)
+
 ---
 
 ## 1. Mathematical Model

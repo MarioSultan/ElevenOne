@@ -2,6 +2,8 @@
 
 The `fit_polynomial` function fits polynomial curves of any degree $n$ to experimental data with full error handling and dimensional awareness.
 
+![Example](https://raw.githubusercontent.com/MarioSultan/ElevenOne/main/imgs/fit_polynomial.png)
+
 ---
 
 ## 1. Mathematical Model
@@ -15,6 +17,7 @@ $$y(x) = a_n \cdot x^n + a_{n-1} \cdot x^{n-1} + \dots + a_1 \cdot x + a_0$$
 ## 2. Inferred Parameter Units
 
 Parameter units scale according to the power of $x$:
+
 * **`a_i`**: $[y] / [x]^i$
 
 *(e.g., for a quadratic trajectory $y = a_2 x^2 + a_1 x + a_0$ where $x$ is in seconds $\text{s}$ and $y$ is in meters $\text{m}$, $a_2$ has units $\text{m}\cdot\text{s}^{-2}$)*.
