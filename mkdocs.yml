@@ -22,7 +22,7 @@ theme:
   # Brand assets
   # Place your logo at docs/assets/logo.png
   logo: assets/logo.png
-  favicon: assets/logo.png
+  favicon: assets/favicon.png
 
   palette:
     - media: "(prefers-color-scheme: light)"
