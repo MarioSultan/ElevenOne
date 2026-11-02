@@ -81,7 +81,7 @@ nav:
       - Unit systems: unit_systems.md
       # - Physical constants: physical_constants.md
 
-  - Data:
+  - Data analysis:
       - Data structures: data_structures.md
       - Load data: load_data.md
       - Operations: operations.md
