@@ -658,3 +658,15 @@
     background: rgba(255, 42, 212, 0.12);
 }
 
+
+/* ==========================================================================
+   17. Read the Docs — Hide version selector
+   ========================================================================== */
+
+/* Hide version selector */
+.rst-versions,
+.rst-current-version,
+.injected {
+    display: none !important;
+}
+
