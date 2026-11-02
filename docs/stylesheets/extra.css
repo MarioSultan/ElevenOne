@@ -516,7 +516,7 @@
     overflow: hidden;
     margin: 1.2em 0;
 
-    box-shadow: 0 3px 12px rgba(0, 204, 255, 0.06);
+    box-shadow: 0 3px 12px rgba(0, 204, 255, 0);
 
     transition:
         border-color 200ms ease,
