@@ -38,28 +38,16 @@ A `Unit` object wraps a `Dimension` along with a scaling factor relative to base
 
 ### Predefined Units
 
-ElevenOne comes with a rich set of predefined units in `elevenone.basic_units`:
+ElevenOne comes with a rich set of predefined units in `elevenone.basic_units`, which are imported automatically with:
 
 ```python
-from elevenone.basic_units import (
-    # Length
-    m, km, cm, mm, um, nm, inch, ft, yd, mi, angstrom,
-    # Mass
-    kg, g, mg, ug, ton, lb, oz,
-    # Time
-    s, ms, us, ns, min_unit, h, day, week, year,
-    # Temperature
-    K, degC, degF, R,
-    # Electricity & Magnetism
-    A, mA, uA, C, Ah, mAh, V, mV, kV, Ohm, kOhm, MOhm,
-    # Force & Pressure
-    N, kN, lbf, dyn, Pa, kPa, MPa, bar, mbar, psi, atm, mmHg,
-    # Energy & Power
-    J, kJ, MJ, cal, kcal, kWh, eV, BTU, W, kW, MW, HP,
-    # Volume & Angular
-    L, mL, m3, gal, rad, deg, counts
-)
+from elevenone import *
 ```
+
+Also, you can import other unit systems like `si_units` or `physics_units`.
+
+📚 For more info, read [unit systems documentation](unit_systems.md).
+
 
 ### Creating Custom Units
 
