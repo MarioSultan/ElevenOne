@@ -50,6 +50,7 @@ Discover everything you can do with ElevenOne here:
 
     - [Basic usage](basic_usage.md)
     - [Quantities, units and uncertainties](quantities_units_and_uncertainties.md)
+    - [Unit systems](unit_systems.md)
 
 ???+ "Data"
 
