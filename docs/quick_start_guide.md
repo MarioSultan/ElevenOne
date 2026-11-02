@@ -2,6 +2,8 @@
 
 This guide provides a quick overview of how to work with **ElevenOne**. You will learn how to create physical quantities with uncertainties, load datasets automatically, perform dimensional operations, plot scientific data, and generate reports.
 
+![Examples](https://raw.githubusercontent.com/MarioSultan/ElevenOne/main/imgs/examples.png)
+
 ---
 
 ## 1. Physical Quantities & Uncertainty Propagation
