@@ -87,6 +87,15 @@ Discover everything you can do with ElevenOne here:
     - [Custom fit](fit_custom.md)
 
 
+??? "Signal analysis"
+
+    - [Signals](signal/signal.md)
+    - [Operations](signal/operations.md)
+    - [Filtering](signal/filtering.md)
+    - [Peak detection](signal/peak_detection.md)
+    - [Frecuency domain analysis](signal/frequency_domain_analysis.md)
+
+
 ------------------------------------------------------------------------
 
 ### Project
