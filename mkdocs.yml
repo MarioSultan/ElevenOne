@@ -111,6 +111,13 @@ nav:
       - Logarithmic fit: fit_logarithmic.md
       - Custom fit: fit_custom.md
 
+  - Signal analysis:
+      - Signals: signal/signal.md
+      - Operations: signal/operations.md
+      - Filtering: signal/filtering.md
+      - Peak detection: signal/peak_detection.md
+      - Frecuency domain analysis: signal/frequency_domain_analysis.md
+
 
 # ---------- Custom styling ----------
 
