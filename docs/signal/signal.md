@@ -4,6 +4,13 @@ The `Signal` class is a specialized structure designed for two-column numerical 
 
 ![Example](https://raw.githubusercontent.com/MarioSultan/ElevenOne/main/imgs/test_plot.png)
 
+To use and maipulate signals in ElevenOne, import the following module. 
+
+```python
+from elevenone.signal import *
+```
+
+
 ---
 
 ## 1. Class Initialization (`__init__`)
@@ -52,11 +59,12 @@ Signal(data=None, x=None, y=None, *, x_name="x", y_name="y", copy=True)
 
 ```python
 import numpy as np
-from mymodule import Signal, Quantity, Unit, SECOND, VOLT
+import elevenone as eo
+from elevenone.signal import *
 
 # Constructing from raw arrays with physical units
-t = Quantity(np.linspace(0, 1, 100), SECOND)
-v = Quantity(np.sin(2 * np.pi * 5 * t.value), VOLT)
+t = eo.Quantity(np.linspace(0, 1, 100), eo.SECOND)
+v = eo.Quantity(np.sin(2 * np.pi * 5 * t.value), eo.VOLT)
 
 sig = Signal(t, v, x_name="Time", y_name="Voltage")
 
