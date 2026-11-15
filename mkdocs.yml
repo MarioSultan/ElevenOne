@@ -78,8 +78,9 @@ nav:
   - Physical quantities and units:
       - Basic usage: basic_usage.md
       - Quantities, units and uncertainties: quantities_units_and_uncertainties.md
+      - Constants: constants.md
       - Unit systems: unit_systems.md
-      # - Physical constants: physical_constants.md
+      - Unit schemes: unit_scheme.md
 
   - Data analysis:
       - Data structures: data_structures.md
@@ -97,6 +98,10 @@ nav:
       - Regression residual plot: residual_plot.md
       - Multivariate pairwise grid: pairplot.md
       - Correlation matrix heatmap: corr_heatmap.md
+      - Phase space plot: phase_space.md
+      - Vector plot: vector_plot.md
+      - Scatter 3D: scatter_3D.md
+      - Surface 3D: surface_3d.md
       - Plots customization: customization.md
 
   - Automated scientific reports:
