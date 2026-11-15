@@ -22,7 +22,7 @@ class Data:
     def register_style(cls, name: str, primary: str = "#00ccff", secondary: str = "#ff2ad4", 
                        facecolor: str = "#fcfcfc", figure_facecolor: str = "#ffffff", 
                        grid_color: str = "#ebebeb", text_color: str = "#1a1a1a", error_color: str = "#888888"):
-        """Registra o actualiza un estilo personalizado en el catálogo de estilos."""
+        """Registers or updates a custom style in the style catalog."""
         cls._styles[name] = {
             "primary": primary,
             "secondary": secondary,
@@ -35,24 +35,24 @@ class Data:
 
     @classmethod
     def list_styles(cls):
-        """Devuelve la lista de nombres de estilos disponibles."""
+        """Returns the list of available style names."""
         return list(cls._styles.keys())
 
     @classmethod
     def set_style(cls, style_name: str = None, **kwargs):
-        """Establece el estilo visual cargando uno guardado o especificando colores directamente.
+        """Sets the visual style by loading a saved style or specifying colors directly.
         
-        Parámetros
+        Parameters
         ----------
-        style_name : str, opcional
-            Nombre del estilo predefinido o registrado a cargar (ej. 'elevenone', 'dark_mode').
+        style_name : str, optional
+            Name of the predefined or registered style to load (e.g., 'elevenone', 'dark_mode').
         **kwargs :
-            Permite sobrescribir atributos individuales del estilo (primary, secondary, facecolor, 
+            Allows overriding individual style attributes (primary, secondary, facecolor, 
             figure_facecolor, grid_color, text_color, error_color).
         """
         if style_name is not None:
             if style_name not in cls._styles:
-                raise ValueError(f"Estilo '{style_name}' no encontrado. Estilos disponibles: {cls.list_styles()}")
+                raise ValueError(f"Style '{style_name}' not found. Available styles: {cls.list_styles()}")
             style_dict = cls._styles[style_name].copy()
             cls._current_style = style_name
         else:
@@ -72,7 +72,7 @@ class Data:
 
     @classmethod
     def set_theme(cls, *args, **kwargs):
-        """Alias retrocompatible para set_style."""
+        """Backward-compatible alias for set_style."""
         if args and isinstance(args[0], str) and args[0] in cls._styles:
             cls.set_style(args[0], **kwargs)
         else:
@@ -297,7 +297,7 @@ class Data:
         if isinstance(errors, dict):
             for col, err in errors.items():
                 if col not in self.dict:
-                    raise KeyError(f"Columna '{col}' no encontrada en Data.")
+                    raise KeyError(f"Column '{col}' not found in Data.")
                 val = self.dict[col]
                 if isinstance(val, Quantity):
                     val.set_error(err)
@@ -306,7 +306,7 @@ class Data:
         else:
             for col in columns:
                 if col not in self.dict:
-                    raise KeyError(f"Columna '{col}' no encontrada en Data.")
+                    raise KeyError(f"Column '{col}' not found in Data.")
                 val = self.dict[col]
                 if isinstance(val, Quantity):
                     val.set_error(errors)
@@ -341,7 +341,7 @@ class Data:
                 col_data = np.asarray([value])
 
         if self._length is not None and len(col_data) != self._length:
-            raise ValueError(f"La longitud de los nuevos datos ({len(col_data)}) no coincide con la del Data ({self._length}).")
+            raise ValueError(f"Length of new data ({len(col_data)}) does not match Data length ({self._length}).")
 
         if self._length is None:
             self._length = len(col_data)
@@ -785,6 +785,603 @@ class Data:
         fig.tight_layout()
         return fig, ax
 
+    # ------------------------------------------------------------------
+    # Helpers for phase_space / vector_field / fit_plot
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _convex_hull(points):
+        """Andrew's monotone chain. Returns the hull vertices in counter-clockwise order."""
+        pts = np.unique(np.asarray(points, dtype=float), axis=0).tolist()
+        if len(pts) <= 2:
+            return np.asarray(pts, dtype=float)
+
+        def cross(o, a, b):
+            return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+        lower = []
+        for q in pts:
+            while len(lower) >= 2 and cross(lower[-2], lower[-1], q) <= 0:
+                lower.pop()
+            lower.append(q)
+        upper = []
+        for q in reversed(pts):
+            while len(upper) >= 2 and cross(upper[-2], upper[-1], q) <= 0:
+                upper.pop()
+            upper.append(q)
+        return np.asarray(lower[:-1] + upper[:-1], dtype=float)
+
+    @classmethod
+    def _error_ribbon_path(cls, xv, yv, ex, ey, n_arc=32):
+        """Builds the exact region swept by the error ellipses (semi-axes ex, ey, in data units)
+        centred on every point of the trajectory.
+
+        For each pair of consecutive points the region is the convex hull of both ellipses
+        (Minkowski sum of the segment with the ellipse). All the pieces are put in a single
+        compound path, so the union is filled only once (no darker overlaps with alpha).
+        """
+        from matplotlib.path import Path
+
+        n_arc = int(max(8, 4 * round(n_arc / 4)))  # multiple of 4 -> axis extremes are hit exactly
+        th = np.linspace(0.0, 2.0 * np.pi, n_arc, endpoint=False)
+        cos_t, sin_t = np.cos(th), np.sin(th)
+        ell = np.stack([xv[:, None] + ex[:, None] * cos_t,
+                        yv[:, None] + ey[:, None] * sin_t], axis=-1)   # (n, n_arc, 2)
+
+        n = len(xv)
+        pairs = [(i, i + 1) for i in range(n - 1)] if n > 1 else [(0, 0)]
+
+        verts, codes = [], []
+        for i, j in pairs:
+            hull = cls._convex_hull(np.vstack([ell[i], ell[j]]))
+            if len(hull) < 3:
+                continue
+            k = len(hull)
+            verts.append(np.vstack([hull, hull[:1]]))
+            codes.append(np.array([Path.MOVETO] + [Path.LINETO] * (k - 1) + [Path.CLOSEPOLY]))
+
+        if not verts:
+            return None
+        return Path(np.vstack(verts), np.concatenate(codes))
+
+    @staticmethod
+    def _min_pair_ratio(px, py, r, eps=1e-9, chunk=512):
+        """min over pairs (i, j) of d_ij / (r_i + r_j), with d_ij in inches. Used to size the arrows
+        so they cannot overlap. Coincident points (d ~ 0) are ignored: overlap there is unavoidable."""
+        best = np.inf
+        n = len(px)
+        for s in range(0, n, chunk):
+            e = min(s + chunk, n)
+            d = np.hypot(px[s:e, None] - px[None, :], py[s:e, None] - py[None, :])
+            w = r[s:e, None] + r[None, :]
+            ok = (d > eps) & (w > 0)
+            if ok.any():
+                best = min(best, float((d[ok] / w[ok]).min()))
+        return best
+
+    @staticmethod
+    def _median_nn_distance(px, py, chunk=512):
+        """Median distance from each point to its nearest neighbour (ignores coincident points)."""
+        n = len(px)
+        if n < 2:
+            return np.inf
+        nn = np.full(n, np.inf)
+        for s in range(0, n, chunk):
+            e = min(s + chunk, n)
+            d = np.hypot(px[s:e, None] - px[None, :], py[s:e, None] - py[None, :])
+            d[d < 1e-9] = np.inf
+            nn[s:e] = d.min(axis=1)
+        nn = nn[np.isfinite(nn)]
+        return float(np.median(nn)) if len(nn) else np.inf
+
+    @staticmethod
+    def _max_free_length(px, py, r, theta, cap, sep, pivot, tol=0.0, max_pairs=2_000_000, iters=16):
+        """Largest k in [0, cap] such that the arrows (segments of length k*r_i starting at the point
+        (px, py) along ``theta``, according to ``pivot``) stay at least ``sep`` apart.
+        All units are inches. Pairs of points closer than ``sep`` are ignored (overlap unavoidable) and
+        up to a fraction ``tol`` of the arrows may touch another one (best effort for irregular clouds).
+        Returns None if there are too many candidate pairs (caller falls back to a cheaper bound)."""
+        n = len(px)
+        o0, o1 = {'middle': (-0.5, 0.5), 'mid': (-0.5, 0.5), 'tail': (0.0, 1.0), 'tip': (-1.0, 0.0)}[pivot]
+        reach = max(abs(o0), abs(o1))
+
+        # Candidate pairs: only those that could touch for some k <= cap
+        I, J, D, Wt, total = [], [], [], [], 0
+        for s in range(0, n, 512):
+            e = min(s + 512, n)
+            d = np.hypot(px[s:e, None] - px[None, :], py[s:e, None] - py[None, :])
+            w = r[s:e, None] + r[None, :]
+            ii, jj = np.nonzero((d >= sep) & (w > 0) & (d <= cap * reach * 2 * w + sep))
+            keep = jj > ii + s
+            ii, jj = ii[keep], jj[keep]
+            D.append(d[ii, jj])
+            Wt.append(w[ii, jj])
+            I.append(ii + s)
+            J.append(jj)
+            total += int(keep.sum())
+            if total > max_pairs:
+                return None
+        if total == 0:
+            return cap
+        I, J, D, Wt = np.concatenate(I), np.concatenate(J), np.concatenate(D), np.concatenate(Wt)
+        cx, cy = np.cos(theta), np.sin(theta)
+        allowed = int(np.floor(tol * n))
+
+        def pt_seg(qx, qy, ax_, ay_, bx, by):
+            dx, dy = bx - ax_, by - ay_
+            l2 = dx * dx + dy * dy
+            t = np.clip(((qx - ax_) * dx + (qy - ay_) * dy) / np.where(l2 > 0, l2, 1.0), 0.0, 1.0)
+            return np.hypot(qx - (ax_ + t * dx), qy - (ay_ + t * dy))
+
+        def collides(k, I, J):
+            L = k * r
+            a0x, a0y = px + o0 * L * cx, py + o0 * L * cy
+            a1x, a1y = px + o1 * L * cx, py + o1 * L * cy
+            Ax0, Ay0, Ax1, Ay1 = a0x[I], a0y[I], a1x[I], a1y[I]
+            Bx0, By0, Bx1, By1 = a0x[J], a0y[J], a1x[J], a1y[J]
+
+            def cross(ox, oy, ax_, ay_, bx, by):
+                return (ax_ - ox) * (by - oy) - (ay_ - oy) * (bx - ox)
+
+            d1 = cross(Bx0, By0, Bx1, By1, Ax0, Ay0)
+            d2 = cross(Bx0, By0, Bx1, By1, Ax1, Ay1)
+            d3 = cross(Ax0, Ay0, Ax1, Ay1, Bx0, By0)
+            d4 = cross(Ax0, Ay0, Ax1, Ay1, Bx1, By1)
+            dist = np.minimum.reduce([
+                pt_seg(Ax0, Ay0, Bx0, By0, Bx1, By1), pt_seg(Ax1, Ay1, Bx0, By0, Bx1, By1),
+                pt_seg(Bx0, By0, Ax0, Ay0, Ax1, Ay1), pt_seg(Bx1, By1, Ax0, Ay0, Ax1, Ay1)])
+            bad = ((d1 * d2 < 0) & (d3 * d4 < 0)) | (dist < sep)
+            if not bad.any():
+                return False
+            return np.unique(np.concatenate([I[bad], J[bad]])).size > allowed
+
+        if not collides(cap, I, J):
+            return cap
+        lo, hi = 0.0, cap
+        for _ in range(iters):
+            mid = 0.5 * (lo + hi)
+            if collides(mid, I, J):
+                hi = mid
+                # pairs that cannot touch for k <= hi never will for smaller k: drop them
+                live = D <= hi * reach * 2 * Wt + sep
+                I, J, D, Wt = I[live], J[live], D[live], Wt[live]
+                if len(I) == 0:
+                    return hi
+            else:
+                lo = mid
+        return lo
+
+    @staticmethod
+    def _fmt_value_err(val, err):
+        """Formats value ± error using 1-2 significant figures for the error."""
+        if not np.isfinite(err) or err <= 0:
+            return f"{val:.4g}"
+        if abs(val) >= 1e5 or (val != 0 and abs(val) < 1e-3) or err < 1e-6:
+            return f"({val:.3e} ± {err:.1e})"
+        e = int(np.floor(np.log10(err)))
+        lead = int(err / 10 ** e)
+        sig = 2 if lead < 3 else 1
+        decimals = max(0, sig - 1 - e)
+        return f"{val:.{decimals}f} ± {err:.{decimals}f}"
+
+    # ==========================================
+    # NEW CHART TYPES
+    # ==========================================
+
+    def phase_space(self, x: str, p: str, ax=None, figsize=(8, 4.5), color=None, linestyle='-', linewidth=2.2,
+                    show_errors=True, error_alpha=0.22, error_scale=1.0, marker='o', markersize=None,
+                    title=None, xlabel=None, ylabel=None, grid=True, **kwargs):
+        """Plots a phase space trajectory (e.g., position vs momentum) preserving trajectory order.
+
+        If ``show_errors`` is True and the columns carry uncertainties, the trajectory is surrounded
+        by a halo of the same colour as the line (just fainter, see ``error_alpha``). The halo is drawn
+        in data coordinates: around every point it spans exactly ±error in x and ±error in p, so it
+        widens and narrows following the error of each point. ``error_scale`` multiplies the errors
+        (e.g. 2 to show a 2σ halo).
+        """
+        from matplotlib.patches import PathPatch
+
+        x_vals, x_errs, x_label = self._get_plot_series(x)
+        p_vals, p_errs, p_label = self._get_plot_series(p)
+
+        xv = np.asarray(x_vals, dtype=float)
+        pv = np.asarray(p_vals, dtype=float)
+        ex = np.abs(np.asarray(x_errs, dtype=float)) * error_scale
+        ep = np.abs(np.asarray(p_errs, dtype=float)) * error_scale
+
+        fig, ax = self._init_plot_figure(ax, figsize)
+        line_color = color if color is not None else self._primary_color
+
+        if show_errors and (np.any(ex != 0) or np.any(ep != 0)):
+            finite = np.isfinite(xv) & np.isfinite(pv) & np.isfinite(ex) & np.isfinite(ep)
+            path = self._error_ribbon_path(xv[finite], pv[finite], ex[finite], ep[finite])
+            if path is not None:
+                ax.add_patch(PathPatch(path, facecolor=line_color, edgecolor='none',
+                                       alpha=error_alpha, zorder=1))
+
+        ax.plot(xv, pv, color=line_color, linestyle=linestyle, linewidth=linewidth,
+                marker=marker, markersize=markersize if markersize is not None else (3 if len(xv) <= 50 else 0),
+                zorder=2, markeredgecolor='white', markeredgewidth=0.5, **kwargs)
+        ax.autoscale_view()
+
+        self._format_labels(ax, xlabel or x_label, ylabel or p_label, title)
+        if grid:
+            self._apply_grid(ax)
+
+        fig.tight_layout()
+        return fig, ax
+
+    def vector_field(self, x: str, y: str, u: str, v: str, ax=None, figsize=(8, 4.5), scale=None,
+                     angles='uv', pivot='middle', color=None, color_by_magnitude=False, cmap=None,
+                     max_length=0.12, gap=0.85, overlap_tolerance=0.05, title=None, xlabel=None, ylabel=None, grid=True,
+                     **kwargs):
+        """Plots a 2D vector field from position columns (x, y) and vector component columns (u, v).
+
+        The arrows are sized automatically so that they do not overlap:
+
+        * ``scale=None``: lengths are proportional to the magnitude of each vector; the longest one is
+          as long as possible without touching its neighbours.
+        * ``scale=s``: ALL arrows have the same length (same modulus). ``s`` is a fraction of the longest
+          length that avoids overlap: ``s=1`` -> as long as possible without touching, ``s=0.5`` -> half
+          of that. Values above 1 may overlap. (Note: this is NOT matplotlib's quiver ``scale``.)
+
+        Parameters
+        ----------
+        angles : {'uv', 'xy'}
+            'uv': the arrow direction is atan2(v, u) on screen (robust when x/y and u/v have different
+            units or scales). 'xy': the direction follows the data axes (u in x units, v in y units).
+        max_length : float
+            Upper bound of the arrow length, as a fraction of the axes width (avoids giant arrows when
+            there are few points).
+        gap : float
+            Fraction (<= 1) of the maximum overlap-free length that is actually used.
+        overlap_tolerance : float
+            Fraction of arrows (0-1) that may touch another one. 0 = strictly no overlaps (can force tiny
+            arrows in irregular point clouds with a few very close points); the default 0.05 ignores
+            the few worst-placed points (default 5%) so the rest can be drawn at a useful size.
+        color_by_magnitude : bool
+            Colours the arrows by |(u, v)| and adds a colorbar (useful when ``scale`` equalises lengths).
+        """
+        kwargs.pop('scale_units', None)  # legacy argument: the length is now handled internally
+        if angles not in ('uv', 'xy'):
+            raise ValueError("angles must be 'uv' or 'xy'.")
+
+        x_vals, _, x_label = self._get_plot_series(x)
+        y_vals, _, y_label = self._get_plot_series(y)
+        u_vals, _, u_label = self._get_plot_series(u)
+        v_vals, _, v_label = self._get_plot_series(v)
+
+        xv, yv, uv, vv = (np.asarray(a, dtype=float) for a in (x_vals, y_vals, u_vals, v_vals))
+        finite = np.isfinite(xv) & np.isfinite(yv) & np.isfinite(uv) & np.isfinite(vv)
+        xv, yv, uv, vv = xv[finite], yv[finite], uv[finite], vv[finite]
+        if len(xv) == 0:
+            raise ValueError("vector_field: there are no finite (x, y, u, v) points to plot.")
+
+        own_axes = ax is None
+        fig, ax = self._init_plot_figure(ax, figsize)
+        vec_color = color if color is not None else self._primary_color
+        mag_phys = np.hypot(uv, vv)
+
+        # Colorbar first, so the axes size is final before sizing the arrows
+        norm = None
+        if color_by_magnitude:
+            from matplotlib.colors import Normalize
+            from matplotlib.cm import ScalarMappable
+            if cmap is None:
+                cmap = LinearSegmentedColormap.from_list("brand_field", [self._secondary_color, self._primary_color])
+            vmin, vmax = float(mag_phys.min()), float(mag_phys.max())
+            norm = Normalize(vmin=vmin, vmax=vmax if vmax > vmin else vmin + 1.0)
+            cbar = fig.colorbar(ScalarMappable(norm=norm, cmap=cmap), ax=ax, fraction=0.046, pad=0.04)
+            cbar.set_label(f"|({u_label}, {v_label})|", fontsize=10, color=self._text_color)
+            cbar.ax.tick_params(labelsize=9, colors='#555555')
+            cbar.outline.set_edgecolor('#d0d0d0')
+
+        self._format_labels(ax, xlabel or x_label, ylabel or y_label, title)
+        if grid:
+            self._apply_grid(ax)
+        fig.tight_layout()
+
+        # Axes size in inches
+        pos = ax.get_position()
+        fig_w, fig_h = fig.get_size_inches()
+        W, H = pos.width * fig_w, pos.height * fig_h
+
+        factor = 1.0 if scale is None else float(scale)
+        is_mid = pivot in ('middle', 'mid')
+        reach = max_length * max(factor, 1.0) * (0.5 if is_mid else 1.0)  # how far arrows stick out of a point
+
+        def _span(a):
+            r = float(np.ptp(a))
+            return r if r > 0 else max(abs(float(a[0])) * 0.1, 1.0)
+
+        # Axis limits leave room for the arrows
+        if own_axes:
+            pad_x = min(reach + 0.04, 0.3)
+            pad_y = min(reach * W / H + 0.04, 0.3)
+            rx, ry = _span(xv), _span(yv)
+            ax.set_xlim(xv.min() - pad_x / (1 - 2 * pad_x) * rx, xv.max() + pad_x / (1 - 2 * pad_x) * rx)
+            ax.set_ylim(yv.min() - pad_y / (1 - 2 * pad_y) * ry, yv.max() + pad_y / (1 - 2 * pad_y) * ry)
+        else:
+            ax.update_datalim(np.column_stack([xv, yv]))
+            ax.autoscale_view()
+
+        xlo, xhi = ax.get_xlim()
+        ylo, yhi = ax.get_ylim()
+        sx, sy = W / abs(xhi - xlo), H / abs(yhi - ylo)          # inches per data unit
+        px, py = (xv - xlo) * sx, (yv - ylo) * sy                # positions on screen (inches)
+
+        # Direction and relative length on screen
+        if angles == 'xy':
+            dx, dy = uv * sx, vv * sy
+        else:
+            dx, dy = uv, vv
+        mag = np.hypot(dx, dy)
+        theta = np.arctan2(dy, dx)
+
+        if scale is None:
+            r = mag / mag.max() if mag.max() > 0 else np.zeros_like(mag)
+        else:
+            r = (mag > 0).astype(float)   # same modulus; null vectors are not drawn
+
+        # Longest common factor k such that no pair of arrows touches (exact segment test);
+        # for huge fields it falls back to a cheaper, more conservative bound.
+        cap = max_length * W
+        sep = min(0.015 * W, 0.1 * self._median_nn_distance(px, py))   # min. clearance (~ arrow head)
+        free = self._max_free_length(px, py, r, theta, cap, sep, 'middle' if is_mid else pivot,
+                                     tol=overlap_tolerance)
+        if free is None:
+            ratio = self._min_pair_ratio(px, py, r)
+            free = cap if not np.isfinite(ratio) else min((2.0 if is_mid else 1.0) * ratio, cap)
+        base = min(free * gap, cap)
+        lengths = factor * base * r                              # inches
+
+        U = lengths / W * np.cos(theta)
+        V = lengths / W * np.sin(theta)
+
+        qkw = dict(angles='uv', scale_units='width', scale=1, pivot=pivot, zorder=3)
+        qkw.update(kwargs)
+        sel = lengths > 0                                        # null vectors are not drawn (no stray dots)
+        if sel.any():
+            if color_by_magnitude:
+                ax.quiver(xv[sel], yv[sel], U[sel], V[sel], mag_phys[sel], cmap=cmap, norm=norm, **qkw)
+            else:
+                ax.quiver(xv[sel], yv[sel], U[sel], V[sel], color=vec_color, **qkw)
+
+        fig.tight_layout()
+        return fig, ax
+
+    def fit_plot(self, x: str, y: str, degree: int = 1, model=None, p0=None, param_names=None, ax=None,
+                 figsize=(8, 6), color=None, fit_color=None, residuals=True, band=True, show_stats=True,
+                 use_x_errors=True, n_sigma=1.0, return_fit=False, title=None, xlabel=None, ylabel=None,
+                 grid=True, **kwargs):
+        """Fit (polynomial or custom model) with confidence band, parameter uncertainties and residuals.
+
+        * Data points are drawn with their error bars; the fit is weighted by the uncertainty of y
+          (and, if ``use_x_errors``, by the effective variance σ_y² + (f'(x)·σ_x)²).
+        * ``degree`` sets the polynomial degree (1 = straight line). Alternatively pass
+          ``model=f(x, *params)`` (needs scipy) and optionally ``p0``.
+        * The shaded band is the ``n_sigma`` uncertainty of the fitted curve (from the covariance matrix).
+        * The bottom panel shows the residuals, normalised by σ when there are errors (the ±1 zone is
+          shaded), together with χ²_red and R² in the text box.
+        * With ``return_fit=True`` it also returns a dict with params, errors, covariance, chi2, chi2_red, dof, r2.
+        """
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+        x_vals, x_errs, x_label = self._get_plot_series(x)
+        y_vals, y_errs, y_label = self._get_plot_series(y)
+        xv, yv = np.asarray(x_vals, dtype=float), np.asarray(y_vals, dtype=float)
+        ex, ey = np.abs(np.asarray(x_errs, dtype=float)), np.abs(np.asarray(y_errs, dtype=float))
+
+        ok = np.isfinite(xv) & np.isfinite(yv)
+        xv, yv, ex, ey = xv[ok], yv[ok], ex[ok], ey[ok]
+
+        has_y_err = bool(np.any(ey > 0))
+        has_x_err = bool(np.any(ex > 0))
+        if has_y_err:
+            sig_y = np.where(ey > 0, ey, ey[ey > 0].min())   # points without error get the smallest one
+        else:
+            sig_y = np.ones_like(yv)
+        absolute = has_y_err
+
+        if model is None:
+            npar = int(degree) + 1
+
+            def model_fn(xx, *c):
+                return np.polynomial.polynomial.polyval(xx, c)
+
+            def jac_fn(xx, popt):
+                return np.vander(xx, npar, increasing=True)
+
+            default_names = [f"c{k}" for k in range(npar)]
+        else:
+            from scipy.optimize import curve_fit
+            if p0 is None:
+                raise ValueError("fit_plot: with a custom model you must provide p0 (initial parameters).")
+            npar = len(p0)
+            model_fn = model
+
+            def jac_fn(xx, popt):
+                J = np.empty((len(xx), npar))
+                for k in range(npar):
+                    h = 1e-6 * max(abs(popt[k]), 1e-3)
+                    pp, pm = np.array(popt, float), np.array(popt, float)
+                    pp[k] += h
+                    pm[k] -= h
+                    J[:, k] = (model_fn(xx, *pp) - model_fn(xx, *pm)) / (2 * h)
+                return J
+
+            default_names = [f"p{k}" for k in range(npar)]
+
+        names = list(param_names) if param_names is not None else default_names
+
+        def do_fit(sig):
+            if model is None:
+                A = np.vander(xv, npar, increasing=True) / sig[:, None]
+                popt, *_ = np.linalg.lstsq(A, yv / sig, rcond=None)
+                pcov = np.linalg.pinv(A.T @ A)
+                if not absolute:
+                    dof_ = len(xv) - npar
+                    if dof_ > 0:
+                        pcov = pcov * (np.sum(((yv - model_fn(xv, *popt)) / sig) ** 2) / dof_)
+            else:
+                popt, pcov = curve_fit(model_fn, xv, yv, p0=p0, sigma=sig if has_y_err else None,
+                                       absolute_sigma=absolute, maxfev=20000)
+            return np.asarray(popt, float), np.asarray(pcov, float)
+
+        use_eff = use_x_errors and has_x_err
+        sig = sig_y.copy()
+        for _ in range(6 if use_eff else 1):
+            popt, pcov = do_fit(sig)
+            if not use_eff:
+                break
+            h = 1e-6 * max(float(np.ptp(xv)), 1e-12)
+            slope = (model_fn(xv + h, *popt) - model_fn(xv - h, *popt)) / (2 * h)
+            sig = np.sqrt(sig_y ** 2 + (slope * ex) ** 2)
+
+        y_fit_pts = model_fn(xv, *popt)
+        resid = yv - y_fit_pts
+        dof = len(xv) - npar
+        chi2 = float(np.sum((resid / sig) ** 2))
+        chi2_red = chi2 / dof if dof > 0 else np.nan
+        ss_tot = float(np.sum((yv - yv.mean()) ** 2))
+        r2 = 1.0 - float(np.sum(resid ** 2)) / ss_tot if ss_tot > 0 else np.nan
+        perr = np.sqrt(np.clip(np.diag(pcov), 0, None))
+
+        # ----- figure -----
+        fig, ax = self._init_plot_figure(ax, figsize)
+        main_color = color if color is not None else self._primary_color
+        line_color = fit_color if fit_color is not None else self._secondary_color
+
+        ax_res = None
+        if residuals:
+            divider = make_axes_locatable(ax)
+            ax_res = divider.append_axes("bottom", size="28%", pad=0.12, sharex=ax)
+            self._init_plot_figure(ax_res, None)
+
+        pad = 0.04 * (float(np.ptp(xv)) or 1.0)
+        xs = np.linspace(xv.min() - pad, xv.max() + pad, 400)
+        ys = model_fn(xs, *popt)
+
+        if band:
+            J = jac_fn(xs, popt)
+            var = np.einsum('ij,jk,ik->i', J, pcov, J)
+            dy = n_sigma * np.sqrt(np.clip(var, 0, None))
+            ax.fill_between(xs, ys - dy, ys + dy, color=line_color, alpha=0.18, linewidth=0, zorder=1)
+
+        ax.plot(xs, ys, color=line_color, linewidth=2.0, zorder=3)
+        n_pts = len(xv)
+        if has_x_err or has_y_err:
+            ax.errorbar(xv, yv, yerr=ey if has_y_err else None, xerr=ex if has_x_err else None, fmt='o',
+                        color=main_color, ecolor=self._error_color, elinewidth=1.2,
+                        capsize=3 if n_pts <= 25 else 0, markersize=4.5 if n_pts <= 25 else 3,
+                        markeredgecolor='white', markeredgewidth=0.6, zorder=4, **kwargs)
+        else:
+            ax.scatter(xv, yv, color=main_color, s=45 if n_pts <= 25 else 15, edgecolors='white',
+                       linewidths=0.6, zorder=4, **kwargs)
+
+        if show_stats:
+            lines = [f"{nm} = {self._fmt_value_err(val, err)}" for nm, val, err in zip(names, popt, perr)]
+            lines.append(rf"$\chi^2_{{red}}$ = {chi2_red:.3g}  (dof = {dof})" if dof > 0 else "dof = 0")
+            lines.append(f"$R^2$ = {r2:.5f}" if np.isfinite(r2) else "")
+            ax.text(0.02, 0.97, "\n".join(l for l in lines if l), transform=ax.transAxes, va='top', ha='left',
+                    fontsize=8.5, color=self._text_color, zorder=5,
+                    bbox=dict(boxstyle='round,pad=0.4', facecolor=self._figure_facecolor,
+                              edgecolor='#d0d0d0', alpha=0.9))
+
+        if residuals:
+            if has_y_err or use_eff:
+                res_plot = resid / sig
+                res_label = "Residuals (σ)"
+                ax_res.axhspan(-1, 1, color=line_color, alpha=0.10, linewidth=0, zorder=1)
+            else:
+                res_plot = resid
+                res_label = f"Residuals ({y_label})"
+            ax_res.axhline(0, color=line_color, linestyle='--', linewidth=1.3, zorder=2)
+            ax_res.scatter(xv, res_plot, color=main_color, s=35 if n_pts <= 25 else 12, edgecolors='white',
+                           linewidths=0.5, zorder=3)
+            ax.tick_params(labelbottom=False)
+            self._format_labels(ax, "", ylabel or y_label, title)
+            self._format_labels(ax_res, xlabel or x_label, res_label, None)
+            if grid:
+                self._apply_grid(ax)
+                self._apply_grid(ax_res)
+        else:
+            self._format_labels(ax, xlabel or x_label, ylabel or y_label, title)
+            if grid:
+                self._apply_grid(ax)
+
+        fig.tight_layout()
+        axes_out = (ax, ax_res) if residuals else ax
+
+        if return_fit:
+            fit = dict(names=names, params=popt, errors=perr, covariance=pcov, chi2=chi2,
+                       chi2_red=chi2_red, dof=dof, r2=r2)
+            return fig, axes_out, fit
+        return fig, axes_out
+
+    def scatter_3d(self, x: str, y: str, z: str, ax=None, figsize=(8, 6), color=None, s=30, alpha=1, 
+                   marker='o', title=None, xlabel=None, ylabel=None, zlabel=None, grid=True, **kwargs):
+        """Plots a 3D scatter plot from Data columns."""
+        x_vals, _, x_label = self._get_plot_series(x)
+        y_vals, _, y_label = self._get_plot_series(y)
+        z_vals, _, z_label = self._get_plot_series(z)
+
+        if ax is None:
+            fig = plt.figure(figsize=figsize, dpi=200)
+            fig.patch.set_facecolor(self._figure_facecolor)
+            ax = fig.add_subplot(projection='3d')
+        else:
+            fig = ax.get_figure()
+
+        ax.set_facecolor(self._facecolor)
+        scatter_color = color if color is not None else self._primary_color
+
+        sc = ax.scatter(x_vals, y_vals, z_vals, color=scatter_color, s=s, alpha=alpha, marker=marker, **kwargs)
+
+        ax.set_xlabel(xlabel or x_label, fontsize=10, fontweight='bold', color=self._text_color, labelpad=10)
+        ax.set_ylabel(ylabel or y_label, fontsize=10, fontweight='bold', color=self._text_color, labelpad=10)
+        ax.set_zlabel(zlabel or z_label, fontsize=10, fontweight='bold', color=self._text_color, labelpad=10)
+
+        if title:
+            ax.set_title(title, fontsize=12, fontweight='bold', color=self._text_color, pad=15)
+
+        fig.tight_layout()
+        return fig, ax
+
+    def surface_3d(self, x: str, y: str, z: str, ax=None, figsize=(8, 6), cmap=None, edgecolor='none', 
+                   alpha=1, title=None, xlabel=None, ylabel=None, zlabel=None, grid=True, **kwargs):
+        """Plots a 3D surface plot using triangulated surface (plot_trisurf) for 1D Data columns."""
+        x_vals, _, x_label = self._get_plot_series(x)
+        y_vals, _, y_label = self._get_plot_series(y)
+        z_vals, _, z_label = self._get_plot_series(z)
+
+        if ax is None:
+            fig = plt.figure(figsize=figsize, dpi=200)
+            fig.patch.set_facecolor(self._figure_facecolor)
+            ax = fig.add_subplot(projection='3d')
+        else:
+            fig = ax.get_figure()
+
+        ax.set_facecolor(self._facecolor)
+
+        if cmap is None:
+            cmap = LinearSegmentedColormap.from_list(
+                "brand_surface", 
+                [self._secondary_color, self._primary_color]
+            )
+
+        surf = ax.plot_trisurf(x_vals, y_vals, z_vals, cmap=cmap, edgecolor=edgecolor, alpha=alpha, **kwargs)
+
+        ax.set_xlabel(xlabel or x_label, fontsize=10, fontweight='bold', color=self._text_color, labelpad=10)
+        ax.set_ylabel(ylabel or y_label, fontsize=10, fontweight='bold', color=self._text_color, labelpad=10)
+        ax.set_zlabel(zlabel or z_label, fontsize=10, fontweight='bold', color=self._text_color, labelpad=10)
+
+        if title:
+            ax.set_title(title, fontsize=12, fontweight='bold', color=self._text_color, pad=15)
+
+        fig.tight_layout()
+        return fig, ax
+
     def generate_report(self, output_path, format_type="html", **kwargs):
         from .report import generate_report
         return generate_report(
@@ -809,8 +1406,8 @@ class DataStatsResult:
                     data_formatted[k] = f"{v.value} {v.unit.symbol}"
             else:
                 data_formatted[k] = v
-        df = pd.DataFrame([data_formatted], index=["valor"])
-        return df.T.rename(columns={0: "Estadística"})._repr_html_()
+        df = pd.DataFrame([data_formatted], index=["value"])
+        return df.T.rename(columns={0: "Statistic"})._repr_html_()
 
 
 class DataDescribeResult:
