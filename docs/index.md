@@ -50,7 +50,9 @@ Discover everything you can do with ElevenOne here:
 
     - [Basic usage](basic_usage.md)
     - [Quantities, units and uncertainties](quantities_units_and_uncertainties.md)
-    - [Unit systems](unit_systems.md)
+    - [Constants](constants.md) NEW
+    - [Unit systems](unit_systems.md) 
+    - [Unit schemes](unit_scheme.md) NEW
 
 ??? "Data analysis"
 
@@ -70,6 +72,10 @@ Discover everything you can do with ElevenOne here:
     - [Regression residual plot](residual_plot.md)
     - [Multivariate pairwise grid](pairplot.md)
     - [Correlation matrix heatmap](corr_heatmap.md)
+    - [Phase space plot](phase_space.md) NEW
+    - [Vector plot](vector_plot.md) NEW
+    - [Scatter 3D](scatter_3D.md) NEW
+    - [Surface 3D](surface_3D.md) NEW
     - [Plots customization](customization.md)
 
 ??? "Automated scientific reports"
