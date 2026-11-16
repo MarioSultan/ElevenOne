@@ -2,7 +2,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
-from .unit import Quantity, Unit
+from .unit import Quantity, Unit, _scheme_view
+from .unit_scheme import get_scheme, convert_to_scheme
 from .dimension import DIMENSIONLESS
 from .styles import DEFAULT_STYLES
 
@@ -186,7 +187,7 @@ class Data:
         local_dict = {}
         for col_name, val in self.dict.items():
             if isinstance(val, Quantity):
-                local_dict[col_name] = val.value
+                local_dict[col_name] = _scheme_view(val).value
             else:
                 local_dict[col_name] = val
 
@@ -371,6 +372,23 @@ class Data:
                 new_dict[k] = np.copy(v) if hasattr(v, '__array__') else v
         return Data(new_dict)
 
+    def to_scheme(self, scheme=None):
+        """Returns a copy of the data with every Quantity column expressed in a unit scheme.
+
+        ``scheme`` can be a registered name, a UnitScheme, or None (the active scheme).
+        Without any scheme this is just a copy.
+
+        Note that while a scheme is active, tables, plots and reports always follow the
+        *active* scheme. To see or plot data in another scheme temporarily, prefer
+        ``with use_scheme("CGS"): ...``; ``to_scheme`` is meant for getting converted
+        data (e.g. to export it) or for working with no scheme active.
+        """
+        converted = self.copy()
+        for name, col in converted.dict.items():
+            if isinstance(col, Quantity):
+                converted.dict[name] = convert_to_scheme(col, scheme)
+        return converted
+
     @property
     def shape(self):
         return (self._length, len(self.dict))
@@ -382,6 +400,7 @@ class Data:
         representation_dict = {}
         for col_name, col_data in self.dict.items():
             if isinstance(col_data, Quantity):
+                col_data = _scheme_view(col_data)
                 representation_dict[f"{col_name} [{col_data.unit.symbol}]"] = col_data.value
                 representation_dict[f"{col_name}_err"] = col_data.error
             else:
@@ -395,7 +414,9 @@ class Data:
         return self._to_dataframe()._repr_html_()
 
     def _numeric_columns(self):
-        return {k: v for k, v in self.dict.items() if isinstance(v, Quantity) or np.issubdtype(v.dtype, np.number)}
+        return {k: (_scheme_view(v) if isinstance(v, Quantity) else v)
+                for k, v in self.dict.items()
+                if isinstance(v, Quantity) or np.issubdtype(v.dtype, np.number)}
 
     def describe(self):
         stats_rows = ['count', 'mean', 'std', 'min', 'Q1', 'Q2', 'Q3', 'max']
@@ -466,6 +487,7 @@ class Data:
         
         col_data = self.dict[col_name]
         if isinstance(col_data, Quantity):
+            col_data = _scheme_view(col_data)
             values = col_data.value
             errors = col_data.error
             label = f"{col_name} [{col_data.unit.symbol}]"
@@ -1384,8 +1406,10 @@ class Data:
 
     def generate_report(self, output_path, format_type="html", **kwargs):
         from .report import generate_report
+        # With an active unit scheme the report is built from a copy expressed in that scheme
+        source = self.to_scheme() if get_scheme() is not None else self
         return generate_report(
-            self, output_path=output_path, format_type=format_type, **kwargs
+            source, output_path=output_path, format_type=format_type, **kwargs
         )
 
 
@@ -1400,6 +1424,7 @@ class DataStatsResult:
         data_formatted = {}
         for k, v in self.stats.items():
             if isinstance(v, Quantity):
+                v = _scheme_view(v)
                 if np.any(v.error != 0):
                     data_formatted[k] = f"({v.value} ± {v.error}) {v.unit.symbol}"
                 else:

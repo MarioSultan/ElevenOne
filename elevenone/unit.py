@@ -87,6 +87,20 @@ RADIAN = Unit(ANGULAR, "rad", 1.0)
 DIMENSIONLESS_UNIT = Unit(DIMENSIONLESS, "1", 1.0)
 
 
+# ------------------------------------------------------------------------------
+# Global unit scheme hook (installed by unit_scheme.set_scheme)
+# ------------------------------------------------------------------------------
+# None (the default) means "no scheme": every quantity is displayed in the unit it
+# carries, exactly as before. Schemes only affect presentation, never arithmetic.
+_scheme_hook = None
+
+
+def _scheme_view(q):
+    """Returns ``q`` expressed in the active unit scheme (``q`` itself if none is active)."""
+    hook = _scheme_hook
+    return q if hook is None else hook(q)
+
+
 class Quantity:
     """Physical quantity with standard uncertainty (1 sigma)."""
     __array_priority__ = 1000
@@ -121,12 +135,14 @@ class Quantity:
         return self
 
     def __str__(self):
-        if np.any(self.error != 0):
-            return f"({self.value} ± {self.error}) {self.unit.symbol}"
-        return f"{self.value} {self.unit.symbol}"
+        q = _scheme_view(self)
+        if np.any(q.error != 0):
+            return f"({q.value} ± {q.error}) {q.unit.symbol}"
+        return f"{q.value} {q.unit.symbol}"
 
     def __repr__(self):
-        return f"Quantity({self.value!r}, {self.unit!r}, error={self.error!r})"
+        q = _scheme_view(self)
+        return f"Quantity({q.value!r}, {q.unit!r}, error={q.error!r})"
 
     def __array__(self, dtype=None, copy=None):
         arr = np.asarray(self.value, dtype=dtype)
@@ -155,6 +171,14 @@ class Quantity:
         return Quantity(target_value, target_unit, target_error)
 
     to = convert_to
+
+    def to_scheme(self, scheme=None):
+        """Returns this quantity expressed in a unit scheme (default: the active one).
+
+        Without any scheme the quantity itself is returned.
+        """
+        from .unit_scheme import convert_to_scheme
+        return convert_to_scheme(self, scheme)
 
     def _coerce_additive(self, other):
         if not isinstance(other, Quantity):
