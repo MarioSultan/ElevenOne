@@ -2,9 +2,9 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
-from .unit import Quantity, Unit, _scheme_view
+from .unit import Quantity, Unit, RADIAN, _scheme_view
 from .unit_scheme import get_scheme, convert_to_scheme
-from .dimension import DIMENSIONLESS
+from .dimension import DIMENSIONLESS, ANGULAR
 from .styles import DEFAULT_STYLES
 
 class Data:
@@ -412,6 +412,112 @@ class Data:
 
     def _repr_html_(self):
         return self._to_dataframe()._repr_html_()
+
+    # ------------------------------------------------------------------
+    # pandas interoperability
+    # ------------------------------------------------------------------
+
+    def to_pandas(self, errors="auto", units=True, scheme=True, err_suffix="_err"):
+        """Converts the Data into a pandas DataFrame.
+
+        Every Quantity column becomes a numeric column named ``"name [unit]"`` followed (if it has
+        uncertainty) by ``"name_err"``. This is the same convention understood by ``load_data`` and
+        by ``Data.from_pandas``, so ``Data.from_pandas(d.to_pandas())`` recovers units and errors.
+
+        Parameters
+        ----------
+        errors : {"auto", True, False}
+            "auto": add the error column only for quantities with some non-zero uncertainty.
+            True: always add it. False: never add it.
+        units : bool
+            If True the unit goes in the column name; if False the names are left bare.
+        scheme : bool
+            If True (default) quantities are expressed in the active unit scheme, like tables
+            and plots do. With False the units each column carries are used.
+        err_suffix : str
+            Suffix of the uncertainty columns.
+        """
+        if errors not in (True, False, "auto"):
+            raise ValueError("errors must be 'auto', True or False.")
+
+        out = {}
+        for name, col in self.dict.items():
+            if isinstance(col, Quantity):
+                q = _scheme_view(col) if scheme else col
+                key = f"{name} [{q.unit.symbol}]" if units else str(name)
+                out[key] = np.array(q.value, copy=True)
+                has_err = bool(np.any(q.error != 0))
+                if errors is True or (errors == "auto" and has_err):
+                    out[f"{name}{err_suffix}"] = np.array(q.error, copy=True)
+            else:
+                out[name] = np.array(col, copy=True)
+        return pd.DataFrame(out)
+
+    @classmethod
+    def from_pandas(cls, df, units=None, errors=None, parse=True):
+        """Builds a Data from a pandas DataFrame (or Series).
+
+        Parameters
+        ----------
+        df : pandas.DataFrame or pandas.Series
+            The index is ignored.
+        units : dict, optional
+            ``{"column": Unit}``. Declares the unit of the numbers in that column (it replaces any
+            unit detected from the header), e.g. ``units={"t": s, "x": m}``.
+        errors : dict, optional
+            ``{"column": error}`` where error is a scalar, an array, a Quantity, or the NAME of another
+            column of ``df`` holding the uncertainties (that column is then not kept as data).
+        parse : bool
+            True (default): units in headers/cells and ``_err`` columns are detected automatically
+            (same rules as ``load_data``). False: the columns are taken as plain numbers.
+        """
+        if isinstance(df, pd.Series):
+            df = df.to_frame(name=df.name if df.name is not None else "value")
+        if not isinstance(df, pd.DataFrame):
+            raise TypeError("from_pandas expects a pandas DataFrame or Series.")
+
+        if parse:
+            from .load import dataframe_to_data
+            data = dataframe_to_data(df)
+        else:
+            data = cls({str(c): df[c].to_numpy() for c in df.columns})
+
+        if units:
+            for col, unit in units.items():
+                if col not in data.dict:
+                    raise KeyError(f"Column '{col}' not found in Data.")
+                val = data.dict[col]
+                if isinstance(val, Quantity):
+                    data.dict[col] = Quantity(val.value, unit, val.error)
+                else:
+                    data.dict[col] = Quantity(np.asarray(val, dtype=float), unit)
+
+        if errors:
+            resolved, to_drop = {}, []
+            for col, err in errors.items():
+                if isinstance(err, str):
+                    if err not in df.columns:
+                        raise KeyError(f"Error column '{err}' not found in the DataFrame.")
+                    resolved[col] = df[err].to_numpy(dtype=float)
+                    if err in data.dict:
+                        to_drop.append(err)
+                else:
+                    resolved[col] = err
+            data.set_error(list(resolved.keys()), resolved)
+            for name in to_drop:
+                del data[name]
+        return data
+
+    def to_csv(self, path, **kwargs):
+        """Writes the data to CSV (units in the headers, uncertainties as ``_err`` columns).
+        The file can be read back with ``load_data``."""
+        kwargs.setdefault("index", False)
+        return self.to_pandas().to_csv(path, **kwargs)
+
+    def to_excel(self, path, **kwargs):
+        """Writes the data to Excel (same layout as ``to_csv``; readable with ``load_data``)."""
+        kwargs.setdefault("index", False)
+        return self.to_pandas().to_excel(path, **kwargs)
 
     def _numeric_columns(self):
         return {k: (_scheme_view(v) if isinstance(v, Quantity) else v)
@@ -1400,6 +1506,174 @@ class Data:
 
         if title:
             ax.set_title(title, fontsize=12, fontweight='bold', color=self._text_color, pad=15)
+
+        fig.tight_layout()
+        return fig, ax
+
+    # ------------------------------------------------------------------
+    # Polar (circular) chart
+    # ------------------------------------------------------------------
+
+    def _get_polar_angles(self, col_name: str, degrees=None):
+        """Returns (theta in radians, error in radians, show_degrees, label) for a column.
+
+        * Quantity with ANGULAR dimension: converted to radians; the ticks are shown in degrees
+          if its unit is not the radian.
+        * Plain numbers (or any other Quantity): if ``degrees`` is None they are assumed to be
+          degrees when some |value| exceeds 2*pi, radians otherwise.
+        """
+        if col_name not in self.dict:
+            raise KeyError(f"Column '{col_name}' not found in Data.")
+
+        col = self.dict[col_name]
+        if isinstance(col, Quantity):
+            q = _scheme_view(col)
+            label = f"{col_name} [{q.unit.symbol}]"
+            if q.unit.dimension == ANGULAR:
+                q_rad = q.convert_to(RADIAN)
+                show_deg = (not np.isclose(q.unit.factor, 1.0)) if degrees is None else bool(degrees)
+                return (np.asarray(q_rad.value, dtype=float), np.asarray(q_rad.error, dtype=float),
+                        show_deg, label)
+            vals = np.asarray(q.value, dtype=float)
+            errs = np.asarray(q.error, dtype=float)
+        else:
+            vals = np.asarray(col, dtype=float)
+            errs = np.zeros_like(vals)
+            label = col_name
+
+        finite = vals[np.isfinite(vals)]
+        if degrees is None:
+            degrees = bool(finite.size and np.max(np.abs(finite)) > 2 * np.pi * 1.0001)
+        if degrees:
+            vals, errs = np.deg2rad(vals), np.deg2rad(errs)
+        return vals, errs, bool(degrees), label
+
+    def polar_plot(self, theta: str, r: str = None, ax=None, figsize=(6, 6), color=None, kind='line',
+                   linestyle='-', linewidth=2.2, marker='o', markersize=None, fill_area=False,
+                   close=False, sort_theta=False, show_errors=True, degrees=None, bins=24,
+                   zero_location='E', clockwise=False, rmin=None, rmax=None,
+                   title=None, thetalabel=None, rlabel=None, grid=True, **kwargs):
+        """Polar chart: like ``plot`` but the x axis (``theta``) is a circle and y (``r``) the radius.
+
+        Angles are handled automatically:
+
+        * If ``theta`` is a Quantity with angular dimension (rad, deg, ...) it is converted to radians
+          internally and the circle is labelled in degrees (if its unit is not the radian) or in
+          multiples of pi.
+        * If ``theta`` is a plain column, it is assumed to be in degrees when some |value| > 2*pi and in
+          radians otherwise. Force it with ``degrees=True/False``.
+        * ``r=None`` draws an angular histogram (rose diagram) of ``theta`` with ``bins`` sectors.
+
+        Parameters
+        ----------
+        kind : {'line', 'scatter', 'bar'}
+            Line (trajectory order is kept unless ``sort_theta=True``), points, or radial bars.
+        close : bool
+            Joins the last point to the first one (closed curves). Only for ``kind='line'``.
+        fill_area : bool
+            Fills the area enclosed by the line (like ``plot``).
+        show_errors : bool
+            Draws the uncertainties of theta and r when present (<= 25 points, as in the other plots).
+        zero_location : str
+            Where theta = 0 sits: 'E' (default, mathematical convention), 'N', 'W', 'S', 'NE', ...
+        clockwise : bool
+            Increasing angles go clockwise (e.g. compass bearings: ``zero_location='N', clockwise=True``).
+        rmin, rmax : float, optional
+            Radial limits.
+        """
+        if kind not in ('line', 'scatter', 'bar'):
+            raise ValueError("kind must be 'line', 'scatter' or 'bar'.")
+
+        t_vals, t_errs, show_deg, t_label = self._get_polar_angles(theta, degrees)
+
+        if r is None:
+            rv, re_ = None, None
+            r_label = "Frequency"
+        else:
+            r_vals, r_errs, r_label = self._get_plot_series(r)
+            rv = np.asarray(r_vals, dtype=float)
+            re_ = np.abs(np.asarray(r_errs, dtype=float))
+            ok = np.isfinite(t_vals) & np.isfinite(rv)
+            t_vals, t_errs, rv, re_ = t_vals[ok], t_errs[ok], rv[ok], re_[ok]
+            if sort_theta:
+                idx = np.argsort(t_vals)
+                t_vals, t_errs, rv, re_ = t_vals[idx], t_errs[idx], rv[idx], re_[idx]
+        t_errs = np.abs(t_errs)
+
+        if ax is None:
+            fig = plt.figure(figsize=figsize, dpi=200)
+            ax = fig.add_subplot(projection='polar')
+        else:
+            fig = ax.get_figure()
+            if getattr(ax, 'name', None) != 'polar':
+                raise ValueError("polar_plot: the given ax must be a polar axes "
+                                 "(fig.add_subplot(projection='polar')).")
+
+        fig.patch.set_facecolor(self._figure_facecolor)
+        ax.set_facecolor(self._facecolor)
+        ax.spines['polar'].set_color('#d0d0d0')
+        ax.spines['polar'].set_linewidth(1.0)
+        ax.tick_params(colors='#555555', which='both', labelsize=10)
+        ax.set_theta_zero_location(zero_location)
+        ax.set_theta_direction(-1 if clockwise else 1)
+
+        main_color = color if color is not None else self._primary_color
+        n = len(t_vals)
+
+        if r is None:
+            counts, edges = np.histogram(np.mod(t_vals[np.isfinite(t_vals)], 2 * np.pi),
+                                         bins=bins, range=(0, 2 * np.pi))
+            centers = 0.5 * (edges[:-1] + edges[1:])
+            ax.bar(centers, counts, width=2 * np.pi / bins, color=main_color, alpha=0.85,
+                   edgecolor='white', linewidth=1.0, zorder=3, **kwargs)
+        else:
+            draw_errors = show_errors and n <= 25 and (np.any(re_ != 0) or np.any(t_errs != 0))
+
+            if kind == 'line':
+                lt, lr = (np.append(t_vals, t_vals[:1]), np.append(rv, rv[:1])) if (close and n > 1) \
+                    else (t_vals, rv)
+                if fill_area:
+                    ax.fill(lt, lr, color=main_color, alpha=0.08, zorder=1)
+                ax.plot(lt, lr, color=main_color, linestyle=linestyle, linewidth=linewidth, marker=marker,
+                        markersize=markersize if markersize is not None else (4.5 if n <= 25 else 0),
+                        zorder=3, markeredgecolor='white', markeredgewidth=0.8, **kwargs)
+            elif kind == 'scatter':
+                ax.scatter(t_vals, rv, color=main_color, s=45 if n <= 25 else 15, zorder=3, **kwargs)
+            else:  # bar
+                width = kwargs.pop('width', None)
+                if width is None:
+                    gaps = np.diff(np.unique(np.round(np.mod(t_vals, 2 * np.pi), 9)))
+                    gaps = gaps[gaps > 1e-9]
+                    width = min(0.9 * gaps.min(), 2 * np.pi) if gaps.size else 2 * np.pi / 24
+                ax.bar(t_vals, rv, width=width, color=main_color, alpha=0.85, edgecolor='white',
+                       linewidth=1.0, zorder=3, **kwargs)
+
+            if draw_errors:
+                ax.errorbar(t_vals, rv, yerr=re_ if np.any(re_ != 0) else None,
+                            xerr=t_errs if np.any(t_errs != 0) else None, fmt='none',
+                            ecolor=self._error_color, elinewidth=1.2, capsize=3, zorder=2)
+
+        # Circle labels: degrees or multiples of pi
+        if show_deg:
+            ticks_deg = np.arange(0, 360, 45)
+            ax.set_xticks(np.deg2rad(ticks_deg))
+            ax.set_xticklabels([f"{int(d)}°" for d in ticks_deg])
+        else:
+            ax.set_xticks(np.arange(8) * np.pi / 4)
+            ax.set_xticklabels(['0', 'π/4', 'π/2', '3π/4', 'π', '5π/4', '3π/2', '7π/4'])
+
+        if rmin is not None or rmax is not None:
+            ax.set_rlim(rmin, rmax)
+        ax.set_rlabel_position(22.5)
+
+        ax.set_xlabel(thetalabel or t_label, fontsize=11, fontweight='bold', color=self._text_color, labelpad=12)
+        ax.set_ylabel(rlabel or r_label, fontsize=11, fontweight='bold', color=self._text_color, labelpad=28)
+        if title:
+            ax.set_title(title, fontsize=13, fontweight='bold', color=self._text_color, pad=20, loc='left')
+        if grid:
+            ax.grid(True, linestyle='--', alpha=0.45, color=self._grid_color, zorder=0)
+        else:
+            ax.grid(False)
 
         fig.tight_layout()
         return fig, ax

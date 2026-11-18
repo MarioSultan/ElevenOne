@@ -4,8 +4,11 @@ import pandas as pd
 import numpy as np
 
 from .data import Data
-from .unit import Quantity, Unit
+from .unit import Quantity, Unit, DIMENSIONLESS_UNIT
 from . import basic_units
+
+_SUPERSCRIPT_TABLE = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻", "0123456789+-")
+_SUPERSCRIPT_RE = re.compile(r"[⁺⁻]?[⁰¹²³⁴⁵⁶⁷⁸⁹]+")
 
 
 class Loader:
@@ -25,7 +28,8 @@ class Loader:
     def _parse_unit_expression(self, expression):
         """Evaluates unit expressions without executing arbitrary code."""
         expr = expression.strip().replace("·", "*").replace("⋅", "*")
-        expr = expr.replace("²", "**2").replace("³", "**3")
+        # Unicode exponents (², ³, ⁻¹, ...) -> **n
+        expr = _SUPERSCRIPT_RE.sub(lambda m: "**" + m.group(0).translate(_SUPERSCRIPT_TABLE), expr)
         expr = expr.replace("^", "**").replace(" ", "")
         if not expr:
             return None
@@ -74,7 +78,11 @@ class Loader:
         # Unit between delimiters. Tries from right to left to allow names
         # containing parentheses unrelated to units.
         for match in reversed(list(re.finditer(r"[\(\[\{]([^\)\]\}]+)[\)\]\}]", cleaned))):
-            unit = self._parse_unit_expression(match.group(1))
+            if match.group(0).startswith("[") and match.group(1).strip() == "1":
+                # "[1]" is how a dimensionless quantity is written by Data.to_pandas
+                unit = DIMENSIONLESS_UNIT
+            else:
+                unit = self._parse_unit_expression(match.group(1))
             if unit is not None:
                 base = (cleaned[:match.start()] + cleaned[match.end():]).strip()
                 return unit, base
@@ -182,6 +190,17 @@ def load_data(filepath, sheet_name=0, **kwargs):
         except Exception:
             df = pd.read_excel(filepath, sheet_name=sheet_name, **kwargs)
 
+    return dataframe_to_data(df)
+
+
+def dataframe_to_data(df):
+    """Converts a pandas DataFrame into a Data object (same rules as load_data).
+
+    Units are read from the headers ('Time (s)', 'v [m/s]', 'v [m·s⁻¹]') or from the cells
+    ('2 m/s'), and columns such as 'x_err', 'x error (m)', 'x_unc' are attached as the
+    uncertainty of 'x'.
+    """
+    loader = Loader()
     parsed = {}
     errors = {}
     original_to_clean = {}
