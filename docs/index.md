@@ -76,6 +76,7 @@ Discover everything you can do with ElevenOne here:
     - [Vector plot](vector_plot.md) NEW
     - [Scatter 3D](scatter_3D.md) NEW
     - [Surface 3D](surface_3D.md) NEW
+    - [Energy levels diagram](energy_levels.md) NEW
     - [Plots customization](customization.md)
 
 ??? "Automated scientific reports"
