@@ -76,7 +76,7 @@ Discover everything you can do with ElevenOne here:
     - [Vector plot](vector_plot.md)
     - [Scatter 3D](scatter_3D.md)
     - [Surface 3D](surface_3D.md)
-    - [Polar plot](plar_plot.md) NEW
+    - [Polar plot](polar_plot.md) NEW
     - [Energy levels diagram](energy_levels.md) NEW
     - [Plots customization](customization.md)
 
