@@ -1,7 +1,6 @@
 # Polar Plot (`Data.polar_plot`)
 
 ![Polar Plot Example](https://raw.githubusercontent.com/MarioSultan/ElevenOne/main/imgs/test_polar_plot.png)
-![Rose Plot Example](https://raw.githubusercontent.com/MarioSultan/ElevenOne/main/imgs/test_rose_plot.png)
 
 The `.polar_plot()` method creates circular visualizations where the angular coordinate (`theta`) is mapped around a circle and the radial coordinate (`r`) extends outward from the center. It supports line trajectories, scatter points, radial bars, and angular histograms (rose diagrams).
 
